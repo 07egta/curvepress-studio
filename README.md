@@ -2,17 +2,22 @@
 
 <div align="center">
 
-**Turn an image into a printable relief plate.**
+**Make a masterpiece you can touch.**
 
-Local-first image processing for curve-based SVG, STEP, 3MF, and STL output.
+Turn artwork into a printable relief plate with a local, beautiful, three-click workflow.
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-111111.svg)](LICENSE)
+[![Tests](https://github.com/07egta/curvepress-studio/actions/workflows/test.yml/badge.svg)](https://github.com/07egta/curvepress-studio/actions/workflows/test.yml)
 ![Status: Alpha](https://img.shields.io/badge/status-alpha-F59E0B.svg)
 
 **English · [日本語](#日本語)**
 
 </div>
+
+> Start with Hokusai's *Great Wave*. In about 30 seconds, turn it into a relief plate you can preview, export, and print.
+>
+> **[Download the source ZIP](https://github.com/07egta/curvepress-studio/archive/refs/heads/main.zip)** · **[See the showcase](docs/SHOWCASE.md)** · **[Try the examples](examples/)**
 
 ## What it does
 
@@ -94,13 +99,37 @@ For a source checkout without the CAD dependency, use `pip install -e .` and add
 | **Poster** | Bold silhouettes and high-contrast icons |
 | **Color separation** | Posters and multicolor plates using 2–6 plates |
 
-## Try a public-domain masterpiece
+## Three classics. Three different results.
 
 <p align="center">
-  <img src="examples/hokusai-great-wave.jpg" width="620" alt="Katsushika Hokusai's The Great Wave off Kanagawa">
+  <img src="examples/hokusai-great-wave.jpg" width="31%" alt="Katsushika Hokusai's The Great Wave off Kanagawa">
+  <img src="examples/mona-lisa.jpg" width="31%" alt="Leonardo da Vinci's Mona Lisa">
+  <img src="examples/starry-night.jpg" width="31%" alt="Vincent van Gogh's The Starry Night">
 </p>
 
-Start with the included [Hokusai example](examples/hokusai-great-wave.jpg), choose **Woodcut**, and turn a historic ukiyo-e composition into a printable relief plate. It is public-domain artwork sourced from [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:The_Great_Wave_at_Kanagawa.jpg), so the repository has a real, rights-cleared demo instead of a placeholder.
+| Start here | Preset to try | What it shows |
+|---|---|---|
+| [Hokusai](examples/hokusai-great-wave.jpg) | **Woodcut** | bold carved waves and clean contours |
+| [Mona Lisa](examples/mona-lisa.jpg) | **Photo halftone** | portrait shading made from dots |
+| [The Starry Night](examples/starry-night.jpg) | **Color separation** | a famous palette split into plates |
+
+These are compact, public-domain reproductions sourced from [Wikimedia Commons](https://commons.wikimedia.org/). They make the first run instantly recognizable while keeping the repository's demo inputs rights-cleared.
+
+## 30-second masterpiece demo
+
+```bash
+git clone https://github.com/07egta/curvepress-studio.git
+cd curvepress-studio
+python -m venv .venv
+```
+
+```powershell
+.venv\Scripts\Activate.ps1
+pip install -e ".[cad]"
+curvepress convert examples/hokusai-great-wave.jpg --style woodcut --width 139 --height 83 --svg-only -o output/hokusai
+```
+
+Open `output/hokusai/` to see the curve-based SVG. For the visual workflow, run `curvepress serve`, click **Hokusai sample**, and compare **Woodcut**, **Poster**, and **Color separation** without selecting a file.
 
 ## CLI examples
 
