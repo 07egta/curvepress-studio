@@ -18,12 +18,3 @@ The Web UI's **Hokusai sample** button loads the same local file, so you can pre
 
 Image regression testing uses the same artwork with the Woodcut preset and reload-checks a 139 × 83 × 2.0 mm STEP with 48 regions and 230 holes. The expected result is one solid, matching dimensions, zero mesh boundary edges, and zero non-manifold edges.
 
-## More classics
-
-| File | Suggested preset | Source and rights |
-|---|---|---|
-| [mona-lisa.jpg](mona-lisa.jpg) | Photo halftone | [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Mona_Lisa.jpg) · public domain |
-| [starry-night.jpg](starry-night.jpg) | Color separation | [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Van_Gogh_-_Starry_Night_-_Google_Art_Project.jpg) · public domain |
-
-The Web UI shows these as small one-click cards under the featured Hokusai sample. They are intentionally compact so a fresh clone stays quick to download.
-

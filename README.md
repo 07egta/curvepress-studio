@@ -99,19 +99,13 @@ For a source checkout without the CAD dependency, use `pip install -e .` and add
 | **Poster** | Bold silhouettes and high-contrast icons |
 | **Color separation** | Posters and multicolor plates using 2–6 plates |
 
-## Three classics. Three different results.
+## One example worth trying
 
 <p align="center">
-  <img src="examples/hokusai-great-wave.jpg" width="31%" alt="Katsushika Hokusai's The Great Wave off Kanagawa">
-  <img src="examples/mona-lisa.jpg" width="31%" alt="Leonardo da Vinci's Mona Lisa">
-  <img src="examples/starry-night.jpg" width="31%" alt="Vincent van Gogh's The Starry Night">
+  <img src="examples/hokusai-great-wave.jpg" width="25%" alt="Katsushika Hokusai's The Great Wave off Kanagawa">
 </p>
 
-| Start here | Preset to try | What it shows |
-|---|---|---|
-| [Hokusai](examples/hokusai-great-wave.jpg) | **Woodcut** | bold carved waves and clean contours |
-| [Mona Lisa](examples/mona-lisa.jpg) | **Photo halftone** | portrait shading made from dots |
-| [The Starry Night](examples/starry-night.jpg) | **Color separation** | a famous palette split into plates |
+Start with [Hokusai's *The Great Wave off Kanagawa*](examples/hokusai-great-wave.jpg) and the **Woodcut** preset for bold carved waves and clean contours.
 
 These are compact, public-domain reproductions sourced from [Wikimedia Commons](https://commons.wikimedia.org/). They make the first run instantly recognizable while keeping the repository's demo inputs rights-cleared.
 
