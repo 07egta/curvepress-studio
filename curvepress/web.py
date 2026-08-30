@@ -7,7 +7,6 @@ import threading
 import traceback
 import webbrowser
 import zipfile
-from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import unquote, urlparse
