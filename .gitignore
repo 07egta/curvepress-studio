@@ -14,6 +14,7 @@ curvepress-start.log
 curvepress-direct-test.log
 curvepress-output/
 .runs/
+work/
 examples/*/
 !examples/README.md
 .DS_Store
