@@ -1,0 +1,14 @@
+To start CurvePress Studio, double-click `Start.exe` in this folder.
+
+`Start.exe` keeps the command window hidden, performs the required startup steps, and opens the app in your browser.
+If Windows SmartScreen appears, choose **More info → Run anyway**.
+
+The Windows portable bundle includes Python and the CAD runtime, so no separate Python installation or pip setup is required. The first launch may take a little longer while the server starts. Later launches open the browser app at the top-left of the screen.
+
+If `Start.exe` cannot be launched, use `Open_CurvePress.bat` in the same folder.
+
+For manual startup:
+  curvepress serve
+
+To stop the server, close the visible `CurvePress server` window.
+
