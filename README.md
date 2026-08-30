@@ -94,6 +94,14 @@ For a source checkout without the CAD dependency, use `pip install -e .` and add
 | **Poster** | Bold silhouettes and high-contrast icons |
 | **Color separation** | Posters and multicolor plates using 2–6 plates |
 
+## Try a public-domain masterpiece
+
+<p align="center">
+  <img src="examples/hokusai-great-wave.jpg" width="620" alt="Katsushika Hokusai's The Great Wave off Kanagawa">
+</p>
+
+Start with the included [Hokusai example](examples/hokusai-great-wave.jpg), choose **Woodcut**, and turn a historic ukiyo-e composition into a printable relief plate. It is public-domain artwork sourced from [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:The_Great_Wave_at_Kanagawa.jpg), so the repository has a real, rights-cleared demo instead of a placeholder.
+
 ## CLI examples
 
 ```bash

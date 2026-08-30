@@ -19,6 +19,9 @@
     .result-grid{display:grid;grid-template-columns:1.2fr .8fr;gap:12px;margin-top:12px}.card{border:1px solid var(--line);border-radius:16px;padding:15px;background:#fff}.card h3{font-size:12px;margin:0 0 10px}.metric-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.metric{background:#f2f2f7;border-radius:11px;padding:9px}.metric span{display:block;color:var(--muted);font-size:9px;text-transform:uppercase;letter-spacing:.08em}.metric b{font-size:14px}.warnings{font-size:11px;color:#8a5a00}.warnings:empty:after{content:""}.downloads{display:flex;gap:7px;flex-wrap:wrap}.download{display:inline-flex;align-items:center;gap:5px;border:1px solid #d2d2d7;background:#fff;color:var(--blue);padding:7px 9px;border-radius:10px;text-decoration:none;font-size:10px;font-weight:650}.download:hover{border-color:var(--blue);background:#eef7ff}
     .footer{display:flex;justify-content:space-between;gap:20px;margin:20px 5px;color:var(--muted);font-size:11px}.hidden{display:none!important}@media(max-width:900px){.shell{padding:15px}.hero{align-items:start;padding:28px 24px}.steps{display:none}.workspace{grid-template-columns:1fr}.controls{position:static}.viewer{min-height:330px;height:48vh}.result-grid{grid-template-columns:1fr}.metric-grid{grid-template-columns:1fr 1fr}.footer{flex-direction:column}.privacy{display:none}}
   </style>
+  <style>
+    .sample-card{display:grid;grid-template-columns:64px minmax(0,1fr);gap:10px;align-items:center;margin:0 0 10px;padding:8px;border:1px solid rgba(0,113,227,.14);border-radius:15px;background:linear-gradient(135deg,#fff,#f1f7ff)}.sample-card img{width:64px;height:48px;object-fit:cover;border-radius:10px;box-shadow:0 5px 14px rgba(0,0,0,.12)}.sample-card strong{display:block;font-size:11px;letter-spacing:-.01em}.sample-card small{display:block;color:var(--muted);font-size:10px;line-height:1.35;margin-top:2px}
+  </style>
 </head>
 <body>
   <main class="shell">
@@ -71,6 +74,15 @@
     ['nozzle','layerHeight','base','relief'].forEach(id=>$('#'+id).addEventListener('input',estimate));['detail','contrast'].forEach(id=>$('#'+id).addEventListener('input',()=>$('#'+id+'Value').textContent=$('#'+id).value));$('#colors').addEventListener('input',()=>$('#colorsValue').textContent=t('colors',{n:$('#colors').value}));
     $$('[data-lang]').forEach(b=>b.addEventListener('click',()=>applyLanguage(b.dataset.lang)));
     $('#sampleBtn').addEventListener('click',async()=>{const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="900" height="540" viewBox="0 0 900 540"><rect width="900" height="540" fill="#f7f1df"/><g fill="none" stroke="#163d57" stroke-width="17"><path d="M45 385C180 185 285 505 420 282S684 62 855 290"/><path d="M45 435C190 300 285 535 445 352S710 182 855 352"/></g><circle cx="675" cy="146" r="62" fill="#e8b744"/><path d="M390 425L512 210l130 215z" fill="#2d6f8c"/><path d="M443 330l69-120 55 91-35-14-21 28-26-18z" fill="#f7f1df"/></svg>`;selectFile(new File([svg],'curvepress_sample.svg',{type:'image/svg+xml'}))});
+    applyLanguage(state.lang);
+  </script>
+  <script>
+    i18n.en.sample='Hokusai sample';i18n.ja.sample='北斎サンプル';i18n.zh.sample='北斋示例';
+    i18n.en.featuredSampleTitle='Hokusai · The Great Wave';i18n.ja.featuredSampleTitle='葛飾北斎 · 神奈川沖浪裏';i18n.zh.featuredSampleTitle='葛饰北斋 · 神奈川冲浪里';
+    i18n.en.featuredSampleHint='Public-domain masterpiece · Woodcut preset';i18n.ja.featuredSampleHint='著作権フリーの名画 · 木版画プリセット';i18n.zh.featuredSampleHint='无版权名画 · 木刻预设';
+    const sampleDrop=$('#drop');
+    if(sampleDrop&&!$('.sample-card')){const card=document.createElement('div');card.className='sample-card';card.innerHTML='<img src="/examples/hokusai-great-wave.jpg" alt="Hokusai The Great Wave"><div><strong data-i18n="featuredSampleTitle"></strong><small data-i18n="featuredSampleHint"></small></div>';sampleDrop.before(card)}
+    $('#sampleBtn').addEventListener('click',async e=>{e.preventDefault();e.stopImmediatePropagation();try{const response=await fetch('/examples/hokusai-great-wave.jpg');if(!response.ok)throw Error('Hokusai sample is unavailable.');const blob=await response.blob();await selectFile(new File([blob],'hokusai-great-wave.jpg',{type:blob.type||'image/jpeg'}));$$('#presets .preset').forEach(x=>x.classList.toggle('active',x.dataset.style==='woodcut'));state.style='woodcut';$('#colorWrap').classList.add('hidden')}catch(error){setRawStatus(error.message,'error')}},true);
     applyLanguage(state.lang);
   </script>
 </body>

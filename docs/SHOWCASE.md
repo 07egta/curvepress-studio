@@ -27,6 +27,14 @@
 - A two- to six-color poster split into separate plates
 - A tactile label, stamp, or small art print experiment
 
+## Featured demo: Hokusai to a printable plate
+
+![Hokusai's Great Wave ready for CurvePress](../examples/hokusai-great-wave.jpg)
+
+Start with the included public-domain reproduction of Katsushika Hokusai's *The Great Wave off Kanagawa*. Choose **Woodcut** for a carved-print feel, then compare **Poster** and **Color separation** to show how one historic image can become several different physical plates. The same file is available from the Web UI's **Hokusai sample** button.
+
+The source is [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:The_Great_Wave_at_Kanagawa.jpg), where the artwork and faithful reproduction are marked public domain.
+
 ## What makes it different
 
 CurvePress is built around a practical constraint: a beautiful preview is not enough if the geometry cannot survive a nozzle. The pipeline keeps source coordinates, simplifies fragile details, applies conservative minimum widths and gaps, and validates the exported STEP when CAD support is installed.
