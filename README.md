@@ -11,7 +11,7 @@ Turn artwork into a printable relief plate with a local, beautiful, three-click 
 [![Tests](https://github.com/07egta/curvepress-studio/actions/workflows/test.yml/badge.svg)](https://github.com/07egta/curvepress-studio/actions/workflows/test.yml)
 ![Status: Alpha](https://img.shields.io/badge/status-alpha-F59E0B.svg)
 
-**English · [日本語](#日本語)**
+**English · [日本語](#日本語) · [中文](#中文)**
 
 </div>
 
@@ -205,6 +205,14 @@ Python 3.11以上を用意し、上の **Quick start** の手順で起動して�
 ### 開発への参加
 
 不具合報告や改善提案は歓迎します。画像を共有できない場合でも、画像形式・解像度・プリセット・ノズル径・警告文を添えてください。詳しくは[CONTRIBUTING.md](CONTRIBUTING.md)をご覧ください。
+
+## 中文
+
+CurvePress Studio 可以把照片、扫描件、线稿和海报转换成适合FDM 3D打印的浮雕版。图像在本地处理，不会上传到云端图像服务。
+
+从 `examples/` 中选择葛饰北斋、蒙娜丽莎或《星月夜》，在网页界面点击 **Hokusai sample** 或对应的示例卡片，然后比较木刻、照片半色调和颜色分离效果。最后可以导出 SVG、STEP、3MF 和 STL。
+
+项目支持日本語、English 和中文界面，欢迎提交 Issue 或 Pull Request。
 
 ## License
 
