@@ -9,8 +9,6 @@ const fs = require('fs');
 const root = path.dirname(process.execPath);
 const batch = path.join(root, 'run_curvepress.bat');
 const log = path.join(root, 'curvepress-start.log');
-const command = `call "${batch}" > "${log}" 2>&1`;
-
 try {
   fs.appendFileSync(log, `${new Date().toISOString()} launcher root=${root} batch=${batch} exists=${fs.existsSync(batch)}\r\n`);
 } catch (_) {
@@ -20,7 +18,7 @@ try {
 if (!fs.existsSync(batch)) {
   process.exitCode = 1;
 } else {
-  const child = spawn(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', command], {
+  const child = spawn(process.env.ComSpec || 'cmd.exe', ['/d', '/c', 'call', batch], {
     cwd: root,
     windowsHide: true,
     stdio: 'ignore',
