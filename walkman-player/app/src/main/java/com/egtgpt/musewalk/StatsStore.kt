@@ -12,14 +12,15 @@ class StatsStore(context: Context) {
     fun get(trackId: Long): TrackStats {
         cache[trackId]?.let { return it }
 
-        val raw = prefs.getString(trackId.toString(), null) ?: TrackStats().also {
-            cache[trackId] = it
+        val raw = prefs.getString(trackId.toString(), null)
+        if (raw == null) {
+            val empty = TrackStats()
+            cache[trackId] = empty
+            return empty
         }
 
-        if (raw is TrackStats) return raw
-
         val parsed = runCatching {
-            val json = JSONObject(raw as String)
+            val json = JSONObject(raw)
             val hours = IntArray(24)
             val arr = json.optJSONArray("hours") ?: JSONArray()
             for (i in 0 until minOf(24, arr.length())) hours[i] = arr.optInt(i)
