@@ -99,6 +99,7 @@ private fun MuseWalkApp(vm: MainViewModel) {
     val ui by vm.ui.collectAsStateWithLifecycle()
     var tab by remember { mutableStateOf(MainTab.Home) }
     var showNowPlaying by remember { mutableStateOf(false) }
+    var showQueue by remember { mutableStateOf(false) }
 
     val permission = if (Build.VERSION.SDK_INT >= 33) {
         Manifest.permission.READ_MEDIA_AUDIO
@@ -118,15 +119,43 @@ private fun MuseWalkApp(vm: MainViewModel) {
         }
     }
 
+    if (showQueue) {
+        BackHandler { showQueue = false }
+        QueueScreen(
+            queue = ui.queue,
+            currentIndex = ui.queueIndex,
+            onBack = { showQueue = false },
+            onSelect = {
+                vm.playQueueIndex(it)
+                showQueue = false
+            }
+        )
+        return
+    }
+
     if (showNowPlaying && ui.current != null) {
+        LaunchedEffect(ui.current?.id, ui.isPlaying) {
+            vm.updateProgress()
+            while (ui.isPlaying) {
+                kotlinx.coroutines.delay(1_000)
+                vm.updateProgress()
+            }
+        }
+
         BackHandler { showNowPlaying = false }
         NowPlayingScreen(
             track = ui.current!!,
             isPlaying = ui.isPlaying,
+            positionMs = ui.playbackPositionMs,
+            durationMs = ui.playbackDurationMs,
+            isFavorite = ui.current!!.id in ui.favorites,
             onBack = { showNowPlaying = false },
             onPrevious = vm::previous,
             onToggle = vm::togglePlayPause,
-            onNext = vm::next
+            onNext = vm::next,
+            onFavorite = { vm.toggleFavorite(ui.current!!) },
+            onSeek = vm::seekTo,
+            onQueue = { showQueue = true }
         )
         return
     }
@@ -192,6 +221,9 @@ private fun MuseWalkApp(vm: MainViewModel) {
 private fun HomeScreen(ui: HomeUiState, vm: MainViewModel, modifier: Modifier = Modifier) {
     val compact = isCompactWalkman()
     val genres = remember(ui.tracks) { ui.genres }
+    val favoriteTracks = remember(ui.tracks, ui.favorites) {
+        ui.tracks.filter { it.id in ui.favorites }.take(12)
+    }
     val recentFavorites = remember(ui.tracks, ui.recommendations) {
         ui.recommendations.filter { it.reason.contains("最後まで") || it.reason.contains("履歴") }.take(8)
     }
@@ -231,6 +263,18 @@ private fun HomeScreen(ui: HomeUiState, vm: MainViewModel, modifier: Modifier = 
                 item = ui.recommendations.firstOrNull(),
                 onPlay = vm::playRecommended
             )
+        }
+
+        if (favoriteTracks.isNotEmpty()) {
+            item {
+                SectionTitle("お気に入り")
+                Spacer(Modifier.height(10.dp))
+                TrackCarousel(
+                    favoriteTracks.map { RecommendedTrack(it, 0.0, "お気に入り") }
+                ) { item ->
+                    vm.play(item.track, favoriteTracks)
+                }
+            }
         }
 
         if (recentFavorites.isNotEmpty()) {
@@ -556,6 +600,9 @@ private fun StatsScreen(ui: HomeUiState, vm: MainViewModel, modifier: Modifier =
         }
         item {
             A300AudioCard()
+        }
+        item {
+            BatteryPolicyCard()
         }
         item { SectionTitle("よく聴く曲") }
         items(ranked.filter { it.second.playCount > 0 }.take(20), key = { it.first.id }) { (track, stats) ->
