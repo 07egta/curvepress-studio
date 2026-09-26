@@ -12,8 +12,8 @@ android {
         applicationId = "com.egtgpt.musewalk"
         minSdk = 28
         targetSdk = 35
-        versionCode = 2
-        versionName = "0.2.0"
+        versionCode = 3
+        versionName = "0.3.0"
     }
 
     buildFeatures { compose = true }
@@ -24,6 +24,18 @@ android {
     }
 
     kotlinOptions { jvmTarget = "17" }
+
+    buildTypes {
+        release {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            signingConfig = signingConfigs.getByName("debug")
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+        }
+    }
 }
 
 dependencies {
