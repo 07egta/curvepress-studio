@@ -358,21 +358,15 @@ private fun LibraryScreen(ui: HomeUiState, vm: MainViewModel, modifier: Modifier
         Column(Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
             Text("ライブラリ", style = MaterialTheme.typography.headlineLarge)
             Spacer(Modifier.height(14.dp))
-            SearchBar(
-                inputField = {
-                    SearchBarDefaults.InputField(
-                        query = ui.searchQuery,
-                        onQueryChange = vm::search,
-                        onSearch = {},
-                        expanded = false,
-                        onExpandedChange = {},
-                        placeholder = { Text("曲、アーティスト、アルバムを検索") },
-                        leadingIcon = { Icon(Icons.Default.Search, null) }
-                    )
-                },
-                expanded = false,
-                onExpandedChange = {}
-            ) {}
+            OutlinedTextField(
+                value = ui.searchQuery,
+                onValueChange = vm::search,
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                shape = RoundedCornerShape(18.dp),
+                placeholder = { Text("曲、アーティスト、アルバムを検索") },
+                leadingIcon = { Icon(Icons.Default.Search, null) }
+            )
             Spacer(Modifier.height(12.dp))
             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 item {
