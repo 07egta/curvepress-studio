@@ -4,8 +4,8 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.Player
-import androidx.media3.exoplayer.ExoPlayer
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -48,10 +48,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val _ui = MutableStateFlow(HomeUiState())
     val ui: StateFlow<HomeUiState> = _ui.asStateFlow()
 
-    private var attachedPlayer: ExoPlayer? = null
+    private var trackById: Map<Long, Track> = emptyMap()
     private var activeTrackId: Long? = null
     private var activeStartedAt: Long = 0L
     private var countedAsFinished = false
+    private var listenerAttached = false
+    private var recommendationJob: Job? = null
 
     private val listener = object : Player.Listener {
         override fun onMediaItemTransition(
@@ -59,7 +61,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             reason: Int
         ) {
             finishPreviousIfNeeded(skipped = reason == Player.MEDIA_ITEM_TRANSITION_REASON_SEEK)
-
             val id = mediaItem?.mediaId?.toLongOrNull()
             activeTrackId = id
             activeStartedAt = System.currentTimeMillis()
@@ -88,118 +89,114 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    private fun ensurePlayer(): Player {
+        val player = PlayerManager.get(getApplication())
+        if (!listenerAttached) {
+            player.addListener(listener)
+            listenerAttached = true
+        }
+        return player
+    }
+
     fun loadLibrary() {
         viewModelScope.launch {
             _ui.value = _ui.value.copy(loading = true, error = null)
 
-            runCatching { library.scan() }
-                .onSuccess { tracks ->
-                    val instantRecommendations = tracks.take(20).mapIndexed { index, track ->
-                        RecommendedTrack(
-                            track = track,
-                            score = (20 - index).toDouble(),
-                            reason = "最近追加"
-                        )
-                    }
+            val result = runCatching { library.scan() }
+            result.onSuccess { tracks ->
+                trackById = tracks.associateBy { it.id }
 
-                    _ui.value = _ui.value.copy(
-                        loading = false,
-                        tracks = tracks,
-                        recommendations = instantRecommendations,
-                        error = null
-                    )
-
-                    PlayerManager.peek()?.let { attachPlayer(it) }
-                    updatePlaybackState()
-
-                    val calculated = withContext(Dispatchers.Default) {
-                        engine.recommend(tracks)
-                    }
-
-                    if (_ui.value.tracks === tracks || _ui.value.tracks == tracks) {
-                        _ui.value = _ui.value.copy(recommendations = calculated)
-                    }
+                // First paint: show the library immediately. Do not block on stats/recommendations.
+                val instant = tracks.take(20).map {
+                    RecommendedTrack(it, 0.0, "最近追加した曲")
                 }
-                .onFailure { e ->
-                    _ui.value = _ui.value.copy(
-                        loading = false,
-                        error = e.message ?: "曲を読み込めませんでした"
-                    )
-                }
-        }
-    }
+                _ui.value = _ui.value.copy(
+                    loading = false,
+                    tracks = tracks,
+                    recommendations = instant,
+                    error = null
+                )
 
-    private fun attachPlayer(player: ExoPlayer) {
-        if (attachedPlayer === player) return
-        attachedPlayer?.removeListener(listener)
-        attachedPlayer = player
-        player.addListener(listener)
-    }
-
-    private fun ensurePlayer(): ExoPlayer {
-        val existing = attachedPlayer ?: PlayerManager.peek()
-        if (existing != null) {
-            attachPlayer(existing)
-            return existing
-        }
-
-        return PlayerManager.get(getApplication<Application>()).also {
-            attachPlayer(it)
+                refreshRecommendations()
+            }.onFailure { e ->
+                _ui.value = _ui.value.copy(
+                    loading = false,
+                    error = e.message ?: "曲を読み込めませんでした"
+                )
+            }
         }
     }
 
     fun play(track: Track, source: List<Track> = _ui.value.visibleTracks) {
-        ensurePlayer()
         val list = if (source.any { it.id == track.id }) source else _ui.value.tracks
-        val index = list.indexOfFirst { it.id == track.id }.coerceAtLeast(0)
-        PlayerManager.play(getApplication(), list, index)
+        val originalIndex = list.indexOfFirst { it.id == track.id }.coerceAtLeast(0)
+
+        // A300 optimization: don't build hundreds of MediaItems for every tap.
+        val before = 16
+        val maxQueue = 80
+        val start = (originalIndex - before).coerceAtLeast(0)
+        val end = (start + maxQueue).coerceAtMost(list.size)
+        val queue = list.subList(start, end)
+        val queueIndex = originalIndex - start
+
+        ensurePlayer()
+        PlayerManager.play(getApplication(), queue, queueIndex)
     }
 
     fun playRecommended() {
         val tracks = _ui.value.tracks
         if (tracks.isEmpty()) return
 
-        val ranked = _ui.value.recommendations.map { it.track }
-        val unseen = tracks.filter { stats.get(it.id).playCount == 0 }.shuffled()
-        val rediscovery = tracks.filter {
-            val last = stats.get(it.id).lastPlayedAt
-            last > 0L && System.currentTimeMillis() - last > 14L * 86_400_000L
-        }.shuffled()
+        viewModelScope.launch {
+            val smartQueue = withContext(Dispatchers.Default) {
+                val ranked = _ui.value.recommendations.map { it.track }
+                val unseen = tracks.asSequence()
+                    .filter { stats.get(it.id).playCount == 0 }
+                    .take(24)
+                    .toList()
+                    .shuffled()
 
-        val smartQueue = buildList {
-            addAll(ranked.take(12))
-            addAll(unseen.take(4))
-            addAll(rediscovery.take(3))
-            addAll(ranked.drop(12))
-        }.distinctBy { it.id }
+                val now = System.currentTimeMillis()
+                val rediscovery = tracks.asSequence()
+                    .filter {
+                        val last = stats.get(it.id).lastPlayedAt
+                        last > 0L && now - last > 14L * 86_400_000L
+                    }
+                    .take(24)
+                    .toList()
+                    .shuffled()
 
-        val first = smartQueue.firstOrNull() ?: return
-        play(first, smartQueue)
+                buildList {
+                    addAll(ranked.take(12))
+                    addAll(unseen.take(4))
+                    addAll(rediscovery.take(3))
+                    addAll(ranked.drop(12))
+                }.distinctBy { it.id }.take(80)
+            }
+
+            val first = smartQueue.firstOrNull() ?: return@launch
+            play(first, smartQueue)
+        }
     }
 
     fun togglePlayPause() {
-        val player = attachedPlayer ?: PlayerManager.peek() ?: return
-        attachPlayer(player)
+        val player = ensurePlayer()
         if (player.isPlaying) player.pause() else player.play()
     }
 
     fun next() {
-        val player = attachedPlayer ?: PlayerManager.peek() ?: return
-        attachPlayer(player)
-
+        val player = ensurePlayer()
         val listened = System.currentTimeMillis() - activeStartedAt
         if (activeTrackId != null && listened in 0 until 45_000) {
             stats.markSkipped(activeTrackId!!, listened)
         }
-
         player.seekToNextMediaItem()
         player.play()
         refreshRecommendations()
     }
 
     fun previous() {
-        val player = attachedPlayer ?: PlayerManager.peek() ?: return
-        attachPlayer(player)
+        val player = ensurePlayer()
         player.seekToPreviousMediaItem()
         player.play()
     }
@@ -216,11 +213,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         val tracks = _ui.value.tracks
         if (tracks.isEmpty()) return
 
-        viewModelScope.launch(Dispatchers.Default) {
-            val recommendations = engine.recommend(tracks)
-            withContext(Dispatchers.Main) {
-                _ui.value = _ui.value.copy(recommendations = recommendations)
+        recommendationJob?.cancel()
+        recommendationJob = viewModelScope.launch {
+            val recommendations = withContext(Dispatchers.Default) {
+                engine.recommend(tracks)
             }
+            _ui.value = _ui.value.copy(recommendations = recommendations)
         }
     }
 
@@ -229,7 +227,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private fun finishPreviousIfNeeded(skipped: Boolean) {
         val id = activeTrackId ?: return
         val listened = (System.currentTimeMillis() - activeStartedAt).coerceAtLeast(0L)
-
         if (skipped) {
             stats.markSkipped(id, listened)
         } else if (!countedAsFinished) {
@@ -239,19 +236,20 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun updatePlaybackState() {
-        val player = attachedPlayer ?: PlayerManager.peek()
-        val currentId = player?.currentMediaItem?.mediaId?.toLongOrNull()
-        val current = _ui.value.tracks.firstOrNull { it.id == currentId }
-
+        val player = PlayerManager.peek() ?: return
+        val currentId = player.currentMediaItem?.mediaId?.toLongOrNull()
+        val current = currentId?.let(trackById::get)
         _ui.value = _ui.value.copy(
             current = current,
-            isPlaying = player?.isPlaying == true
+            isPlaying = player.isPlaying
         )
     }
 
     override fun onCleared() {
-        attachedPlayer?.removeListener(listener)
-        attachedPlayer = null
+        recommendationJob?.cancel()
+        PlayerManager.peek()?.let { player ->
+            if (listenerAttached) player.removeListener(listener)
+        }
         super.onCleared()
     }
 }
