@@ -50,7 +50,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun MuseWalkTheme(content: @Composable () -> Unit) {
     val dark = androidx.compose.foundation.isSystemInDarkTheme()
-    val compact = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp <= 380
+    val compact = isCompactWalkman()
     val light = lightColorScheme(
         primary = Color(0xFF111111),
         onPrimary = Color.White,
@@ -84,6 +84,12 @@ private fun MuseWalkTheme(content: @Composable () -> Unit) {
 }
 
 private enum class MainTab { Home, Library, Stats }
+
+@Composable
+private fun isCompactWalkman(): Boolean {
+    val width = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp
+    return WalkmanProfile.detect().isA300 || width <= 380
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -123,7 +129,7 @@ private fun MuseWalkApp(vm: MainViewModel) {
                         onNext = vm::next
                     )
                 }
-                val compact = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp <= 380
+                val compact = isCompactWalkman()
                 NavigationBar(
                     modifier = Modifier.height(if (compact) 64.dp else 80.dp),
                     containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f)
@@ -189,7 +195,7 @@ private fun MuseWalkApp(vm: MainViewModel) {
 
 @Composable
 private fun HomeScreen(ui: HomeUiState, vm: MainViewModel, modifier: Modifier = Modifier) {
-    val compact = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp <= 380
+    val compact = isCompactWalkman()
     val recentFavorites = remember(ui.tracks, ui.recommendations) {
         ui.recommendations.filter { it.reason.contains("最後まで") || it.reason.contains("履歴") }.take(8)
     }
@@ -214,6 +220,10 @@ private fun HomeScreen(ui: HomeUiState, vm: MainViewModel, modifier: Modifier = 
                     fontSize = if (compact) 13.sp else 14.sp
                 )
             }
+        }
+
+        item {
+            A300AudioCard()
         }
 
         item {
@@ -267,8 +277,79 @@ private fun HomeScreen(ui: HomeUiState, vm: MainViewModel, modifier: Modifier = 
 }
 
 @Composable
+private fun A300AudioCard() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val profile = remember { WalkmanProfile.detect() }
+    if (!profile.isA300) return
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
+    ) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Headphones, null, Modifier.size(22.dp))
+                Spacer(Modifier.width(8.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("A300 × EarFun Air Pro 4", fontWeight = FontWeight.Bold)
+                    Text(
+                        "加工しすぎず、自動補完と音量統一を優先",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 11.sp
+                    )
+                }
+            }
+
+            Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                AudioSettingLine("Bluetooth", "LDAC")
+                AudioSettingLine("音源補完", "DSEE Ultimate ON")
+                AudioSettingLine("曲間音量", "ダイナミックノーマライザー ON")
+                AudioSettingLine("EQ / ピッチ", "変更しない")
+            }
+
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilledTonalButton(
+                    onClick = { WalkmanProfile.openBluetoothSettings(context) },
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
+                ) {
+                    Icon(Icons.Default.Bluetooth, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(5.dp))
+                    Text("LDAC確認", fontSize = 12.sp)
+                }
+                OutlinedButton(
+                    onClick = { WalkmanProfile.openSoundSettings(context) },
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
+                ) {
+                    Icon(Icons.Default.Tune, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(5.dp))
+                    Text("音質設定", fontSize = 12.sp)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AudioSettingLine(label: String, value: String) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            label,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontSize = 11.sp,
+            modifier = Modifier.width(72.dp)
+        )
+        Text(value, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+@Composable
 private fun HeroRecommendation(item: RecommendedTrack?, onPlay: () -> Unit) {
-    val compact = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp <= 380
+    val compact = isCompactWalkman()
     val track = item?.track
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -350,7 +431,7 @@ private fun HeroRecommendation(item: RecommendedTrack?, onPlay: () -> Unit) {
 
 @Composable
 private fun TrackCarousel(items: List<RecommendedTrack>, onClick: (RecommendedTrack) -> Unit) {
-    val compact = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp <= 380
+    val compact = isCompactWalkman()
     val itemSize = if (compact) 116.dp else 148.dp
     LazyRow(horizontalArrangement = Arrangement.spacedBy(if (compact) 10.dp else 14.dp)) {
         items(items, key = { it.track.id }) { item ->
@@ -382,7 +463,7 @@ private fun TrackCarousel(items: List<RecommendedTrack>, onClick: (RecommendedTr
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun LibraryScreen(ui: HomeUiState, vm: MainViewModel, modifier: Modifier = Modifier) {
-    val compact = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp <= 380
+    val compact = isCompactWalkman()
     Column(modifier.fillMaxSize()) {
         Column(
             Modifier.padding(
@@ -442,7 +523,7 @@ private fun LibraryScreen(ui: HomeUiState, vm: MainViewModel, modifier: Modifier
 
 @Composable
 private fun StatsScreen(ui: HomeUiState, vm: MainViewModel, modifier: Modifier = Modifier) {
-    val compact = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp <= 380
+    val compact = isCompactWalkman()
     val ranked = remember(ui.tracks, ui.recommendations) {
         ui.tracks.map { it to vm.statsFor(it) }.sortedByDescending { it.second.playCount }
     }
@@ -492,7 +573,7 @@ private fun StatsScreen(ui: HomeUiState, vm: MainViewModel, modifier: Modifier =
 
 @Composable
 private fun MetricCard(label: String, value: String, modifier: Modifier = Modifier) {
-    val compact = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp <= 380
+    val compact = isCompactWalkman()
     Card(
         modifier = modifier,
         shape = RoundedCornerShape(if (compact) 18.dp else 24.dp),
@@ -508,7 +589,7 @@ private fun MetricCard(label: String, value: String, modifier: Modifier = Modifi
 
 @Composable
 private fun TrackRow(track: Track, subtitle: String, onClick: () -> Unit) {
-    val compact = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp <= 380
+    val compact = isCompactWalkman()
     Row(
         Modifier
             .fillMaxWidth()
@@ -571,7 +652,7 @@ private fun MiniPlayer(
     onNext: () -> Unit
 ) {
     if (track == null) return
-    val compact = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp <= 380
+    val compact = isCompactWalkman()
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -608,7 +689,7 @@ private fun NowPlayingSheet(
     onToggle: () -> Unit,
     onNext: () -> Unit
 ) {
-    val compact = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp <= 380
+    val compact = isCompactWalkman()
     Column(
         Modifier
             .fillMaxWidth()
@@ -701,7 +782,7 @@ private fun PermissionError(text: String, modifier: Modifier = Modifier, onRetry
 
 @Composable
 private fun SectionTitle(text: String) {
-    val compact = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp <= 380
+    val compact = isCompactWalkman()
     Text(
         text,
         style = MaterialTheme.typography.titleLarge,
