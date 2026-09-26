@@ -28,9 +28,15 @@ object PlayerManager {
                 .also { player = it }
         }
 
-    fun play(context: Context, tracks: List<Track>, startIndex: Int) {
+    fun play(
+        context: Context,
+        tracks: List<Track>,
+        startIndex: Int,
+        initialVolume: Float = 1f
+    ) {
         context.startService(Intent(context, PlaybackService::class.java))
         val p = get(context)
+        p.volume = initialVolume.coerceIn(0.08f, 1f)
         val items = tracks.map { track ->
             MediaItem.Builder()
                 .setUri(track.uri)
