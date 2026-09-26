@@ -1,6 +1,7 @@
 package com.egtgpt.musewalk
 
 import android.content.Context
+import android.content.Intent
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.exoplayer.ExoPlayer
@@ -14,6 +15,7 @@ object PlayerManager {
         }
 
     fun play(context: Context, tracks: List<Track>, startIndex: Int) {
+        context.startService(Intent(context, PlaybackService::class.java))
         val p = get(context)
         val items = tracks.map { track ->
             MediaItem.Builder()
