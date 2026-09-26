@@ -104,8 +104,25 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun playRecommended() {
-        val first = _ui.value.recommendations.firstOrNull()?.track ?: return
-        play(first, _ui.value.recommendations.map { it.track })
+        val tracks = _ui.value.tracks
+        if (tracks.isEmpty()) return
+
+        val ranked = _ui.value.recommendations.map { it.track }
+        val unseen = tracks.filter { stats.get(it.id).playCount == 0 }.shuffled()
+        val rediscovery = tracks.filter {
+            val last = stats.get(it.id).lastPlayedAt
+            last > 0L && System.currentTimeMillis() - last > 14L * 86_400_000L
+        }.shuffled()
+
+        val smartQueue = buildList {
+            addAll(ranked.take(12))
+            addAll(unseen.take(4))
+            addAll(rediscovery.take(3))
+            addAll(ranked.drop(12))
+        }.distinctBy { it.id }
+
+        val first = smartQueue.firstOrNull() ?: return
+        play(first, smartQueue)
     }
 
     fun togglePlayPause() {
