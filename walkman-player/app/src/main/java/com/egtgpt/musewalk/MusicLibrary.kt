@@ -9,6 +9,11 @@ import kotlinx.coroutines.withContext
 class MusicLibrary(private val context: Context) {
     suspend fun scan(): List<Track> = withContext(Dispatchers.IO) {
         val result = mutableListOf<Track>()
+        val pathColumn = if (android.os.Build.VERSION.SDK_INT >= 29) {
+            MediaStore.Audio.Media.RELATIVE_PATH
+        } else {
+            MediaStore.Audio.Media.DATA
+        }
         val projection = arrayOf(
             MediaStore.Audio.Media._ID,
             MediaStore.Audio.Media.TITLE,
@@ -16,7 +21,7 @@ class MusicLibrary(private val context: Context) {
             MediaStore.Audio.Media.ALBUM,
             MediaStore.Audio.Media.DURATION,
             MediaStore.Audio.Media.DATE_ADDED,
-            MediaStore.Audio.Media.RELATIVE_PATH
+            pathColumn
         )
 
         context.contentResolver.query(
@@ -32,7 +37,7 @@ class MusicLibrary(private val context: Context) {
             val albumCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM)
             val durationCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION)
             val addedCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DATE_ADDED)
-            val pathCol = cursor.getColumnIndex(MediaStore.Audio.Media.RELATIVE_PATH)
+            val pathCol = cursor.getColumnIndex(pathColumn)
 
             while (cursor.moveToNext()) {
                 val id = cursor.getLong(idCol)
