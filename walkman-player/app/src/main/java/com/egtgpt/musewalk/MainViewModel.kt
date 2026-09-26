@@ -217,10 +217,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun next() {
         val player = PlayerManager.peek() ?: return
-        val listened = System.currentTimeMillis() - activeStartedAt
-        if (activeTrackId != null && listened >= 0L && listened < 45_000L) {
-            stats.markSkipped(activeTrackId!!, listened)
-        }
+        // The media-item transition listener records the skip exactly once.
         player.seekToNextMediaItem()
         player.play()
         // Do not recalculate recommendations here: this may happen with screen off.
@@ -308,9 +305,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private fun finishPreviousIfNeeded(skipped: Boolean) {
         val id = activeTrackId ?: return
         val listened = (System.currentTimeMillis() - activeStartedAt).coerceAtLeast(0L)
-        if (skipped) {
+        if (skipped && listened < 45_000L) {
             stats.markSkipped(id, listened)
-        } else if (!countedAsFinished) {
+        } else if (!skipped && !countedAsFinished) {
             stats.markFinished(id, listened)
         }
         // Battery policy: recommendations update on launch/favorite changes, not every song.
