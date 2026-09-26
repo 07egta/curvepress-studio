@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -350,7 +351,7 @@ private fun A300AudioCard() {
             Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
                 AudioSettingLine("Bluetooth", "LDAC")
                 AudioSettingLine("音源補完", "DSEE Ultimate ON")
-                AudioSettingLine("曲間音量", "ダイナミックノーマライザー ON")
+                AudioSettingLine("曲間音量", "ReplayGain/R128 + Sony補正")
                 AudioSettingLine("EQ / ピッチ", "変更しない")
             }
 
@@ -738,12 +739,24 @@ private fun MiniPlayer(
 private fun NowPlayingScreen(
     track: Track,
     isPlaying: Boolean,
+    positionMs: Long,
+    durationMs: Long,
+    isFavorite: Boolean,
     onBack: () -> Unit,
     onPrevious: () -> Unit,
     onToggle: () -> Unit,
-    onNext: () -> Unit
+    onNext: () -> Unit,
+    onFavorite: () -> Unit,
+    onSeek: (Long) -> Unit,
+    onQueue: () -> Unit
 ) {
     val compact = isCompactWalkman()
+    var dragging by remember(track.id) { mutableStateOf(false) }
+    var dragPosition by remember(track.id) { mutableFloatStateOf(positionMs.toFloat()) }
+
+    LaunchedEffect(positionMs, dragging) {
+        if (!dragging) dragPosition = positionMs.toFloat()
+    }
 
     BoxWithConstraints(
         modifier = Modifier
@@ -753,27 +766,24 @@ private fun NowPlayingScreen(
             .navigationBarsPadding()
     ) {
         val artworkSize = if (compact) {
-            minOf(maxWidth * 0.58f, maxHeight * 0.26f)
+            minOf(maxWidth * 0.52f, maxHeight * 0.24f)
         } else {
-            minOf(maxWidth * 0.74f, maxHeight * 0.38f)
+            minOf(maxWidth * 0.70f, maxHeight * 0.36f)
         }
 
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = if (compact) 18.dp else 28.dp),
+                .padding(horizontal = if (compact) 16.dp else 28.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(if (compact) 48.dp else 56.dp),
+                    .height(if (compact) 46.dp else 56.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(
-                    onClick = onBack,
-                    modifier = Modifier.size(48.dp)
-                ) {
+                IconButton(onClick = onBack, modifier = Modifier.size(48.dp)) {
                     Icon(
                         Icons.Default.KeyboardArrowDown,
                         contentDescription = "閉じる",
@@ -788,54 +798,100 @@ private fun NowPlayingScreen(
                     fontWeight = FontWeight.SemiBold
                 )
                 Spacer(Modifier.weight(1f))
-                Spacer(Modifier.size(48.dp))
+                IconButton(onClick = onQueue, modifier = Modifier.size(48.dp)) {
+                    Icon(
+                        Icons.Default.QueueMusic,
+                        contentDescription = "再生キュー",
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
             }
 
-            Spacer(Modifier.height(if (compact) 6.dp else 14.dp))
+            Spacer(Modifier.height(if (compact) 2.dp else 12.dp))
 
             Artwork(
                 track,
                 Modifier
                     .size(artworkSize)
-                    .clip(RoundedCornerShape(if (compact) 24.dp else 30.dp))
+                    .clip(RoundedCornerShape(if (compact) 22.dp else 30.dp))
             )
 
-            Spacer(Modifier.height(if (compact) 12.dp else 28.dp))
+            Spacer(Modifier.height(if (compact) 10.dp else 24.dp))
 
-            Text(
-                text = track.title,
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                fontSize = if (compact) 17.sp else 24.sp,
-                lineHeight = if (compact) 20.sp else 29.sp,
-                fontWeight = FontWeight.Bold,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        text = track.title,
+                        fontSize = if (compact) 17.sp else 24.sp,
+                        lineHeight = if (compact) 20.sp else 29.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        text = track.artist,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = if (compact) 12.sp else 15.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                IconButton(onClick = onFavorite, modifier = Modifier.size(48.dp)) {
+                    Icon(
+                        if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                        contentDescription = if (isFavorite) "お気に入り解除" else "お気に入り",
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(if (compact) 4.dp else 10.dp))
+
+            val safeDuration = durationMs.coerceAtLeast(1L)
+            Slider(
+                value = if (dragging) dragPosition else positionMs.coerceIn(0L, safeDuration).toFloat(),
+                onValueChange = {
+                    dragging = true
+                    dragPosition = it
+                },
+                onValueChangeFinished = {
+                    onSeek(dragPosition.toLong())
+                    dragging = false
+                },
+                valueRange = 0f..safeDuration.toFloat(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(if (compact) 34.dp else 42.dp)
             )
 
-            Spacer(Modifier.height(4.dp))
-
-            Text(
-                text = track.artist,
-                modifier = Modifier.fillMaxWidth(),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontSize = if (compact) 12.sp else 15.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            Row(Modifier.fillMaxWidth()) {
+                Text(
+                    formatDuration((if (dragging) dragPosition.toLong() else positionMs).coerceAtLeast(0L)),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 10.sp
+                )
+                Spacer(Modifier.weight(1f))
+                Text(
+                    formatDuration(durationMs),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 10.sp
+                )
+            }
 
             Spacer(Modifier.weight(1f))
 
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(if (compact) 74.dp else 96.dp),
+                    .height(if (compact) 70.dp else 92.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(
-                    onClick = onPrevious,
-                    modifier = Modifier.size(52.dp)
-                ) {
+                IconButton(onClick = onPrevious, modifier = Modifier.size(52.dp)) {
                     Icon(
                         Icons.Default.SkipPrevious,
                         contentDescription = "前の曲",
@@ -855,10 +911,7 @@ private fun NowPlayingScreen(
                     )
                 }
 
-                IconButton(
-                    onClick = onNext,
-                    modifier = Modifier.size(52.dp)
-                ) {
+                IconButton(onClick = onNext, modifier = Modifier.size(52.dp)) {
                     Icon(
                         Icons.Default.SkipNext,
                         contentDescription = "次の曲",
@@ -868,13 +921,157 @@ private fun NowPlayingScreen(
             }
 
             Text(
-                text = track.genre + "  ·  " + formatDuration(track.durationMs),
+                text = track.genre,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontSize = if (compact) 11.sp else 12.sp,
+                fontSize = if (compact) 10.5.sp else 12.sp,
                 maxLines = 1
             )
 
-            Spacer(Modifier.height(if (compact) 10.dp else 18.dp))
+            Spacer(Modifier.height(if (compact) 7.dp else 16.dp))
+        }
+    }
+}
+
+@Composable
+private fun QueueScreen(
+    queue: List<Track>,
+    currentIndex: Int,
+    onBack: () -> Unit,
+    onSelect: (Int) -> Unit
+) {
+    val compact = isCompactWalkman()
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .statusBarsPadding()
+            .navigationBarsPadding()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(if (compact) 50.dp else 58.dp)
+                .padding(horizontal = 6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onBack, modifier = Modifier.size(48.dp)) {
+                Icon(Icons.Default.ArrowBack, contentDescription = "戻る")
+            }
+            Text(
+                "再生キュー",
+                style = MaterialTheme.typography.titleLarge,
+                fontSize = if (compact) 19.sp else 22.sp
+            )
+            Spacer(Modifier.weight(1f))
+            Text(
+                queue.size.toString() + "曲",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 11.sp
+            )
+            Spacer(Modifier.width(10.dp))
+        }
+
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
+
+        if (queue.isEmpty()) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("キューは空です", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        } else {
+            LazyColumn(
+                contentPadding = PaddingValues(
+                    horizontal = if (compact) 8.dp else 14.dp,
+                    vertical = 6.dp
+                )
+            ) {
+                itemsIndexed(queue, key = { _, track -> track.id }) { index, track ->
+                    val active = index == currentIndex
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(14.dp))
+                            .clickable { onSelect(index) },
+                        color = if (active) {
+                            MaterialTheme.colorScheme.surfaceVariant
+                        } else {
+                            Color.Transparent
+                        }
+                    ) {
+                        Row(
+                            Modifier.padding(horizontal = 6.dp, vertical = 5.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                Modifier.width(22.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (active) {
+                                    Icon(
+                                        Icons.Default.GraphicEq,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(17.dp)
+                                    )
+                                } else {
+                                    Text(
+                                        (index + 1).toString(),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        fontSize = 10.sp
+                                    )
+                                }
+                            }
+                            Artwork(track, Modifier.size(if (compact) 43.dp else 50.dp))
+                            Spacer(Modifier.width(9.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    track.title,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    fontWeight = if (active) FontWeight.Bold else FontWeight.Medium
+                                )
+                                Text(
+                                    track.artist,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontSize = 11.sp
+                                )
+                            }
+                            Text(
+                                formatDuration(track.durationMs),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = 10.sp
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BatteryPolicyCard() {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Row(
+            Modifier.padding(13.dp),
+            verticalAlignment = Alignment.Top
+        ) {
+            Icon(Icons.Default.Bolt, contentDescription = null, Modifier.size(21.dp))
+            Spacer(Modifier.width(9.dp))
+            Column {
+                Text("A300 省電力モード", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                Spacer(Modifier.height(3.dp))
+                Text(
+                    "再生位置更新は再生画面だけ・おすすめは曲ごとに再計算しない・音量情報は一度だけ読み取りキャッシュ・キューは最大60曲。",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 10.5.sp,
+                    lineHeight = 14.sp
+                )
+            }
         }
     }
 }
