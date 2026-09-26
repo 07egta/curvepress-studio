@@ -191,6 +191,7 @@ private fun MuseWalkApp(vm: MainViewModel) {
 @Composable
 private fun HomeScreen(ui: HomeUiState, vm: MainViewModel, modifier: Modifier = Modifier) {
     val compact = isCompactWalkman()
+    val genres = remember(ui.tracks) { ui.genres }
     val recentFavorites = remember(ui.tracks, ui.recommendations) {
         ui.recommendations.filter { it.reason.contains("最後まで") || it.reason.contains("履歴") }.take(8)
     }
