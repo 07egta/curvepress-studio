@@ -102,6 +102,21 @@ private fun MuseWalkApp(vm: MainViewModel) {
     var showNowPlaying by remember { mutableStateOf(false) }
     var showQueue by remember { mutableStateOf(false) }
 
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    var appInForeground by remember {
+        mutableStateOf(
+            lifecycleOwner.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)
+        )
+    }
+    DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, _ ->
+            appInForeground = lifecycleOwner.lifecycle.currentState
+                .isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
     val permission = if (Build.VERSION.SDK_INT >= 33) {
         Manifest.permission.READ_MEDIA_AUDIO
     } else {
@@ -135,11 +150,13 @@ private fun MuseWalkApp(vm: MainViewModel) {
     }
 
     if (showNowPlaying && ui.current != null) {
-        LaunchedEffect(ui.current?.id, ui.isPlaying) {
-            vm.updateProgress()
-            while (ui.isPlaying) {
-                kotlinx.coroutines.delay(1_000)
+        LaunchedEffect(ui.current?.id, ui.isPlaying, appInForeground) {
+            if (appInForeground) {
                 vm.updateProgress()
+                while (ui.isPlaying && appInForeground) {
+                    kotlinx.coroutines.delay(1_000)
+                    vm.updateProgress()
+                }
             }
         }
 
