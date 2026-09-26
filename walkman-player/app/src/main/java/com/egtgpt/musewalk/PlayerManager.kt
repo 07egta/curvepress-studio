@@ -11,6 +11,8 @@ import androidx.media3.exoplayer.ExoPlayer
 object PlayerManager {
     @Volatile private var player: ExoPlayer? = null
 
+    fun peek(): ExoPlayer? = player
+
     fun get(context: Context): ExoPlayer =
         player ?: synchronized(this) {
             player ?: ExoPlayer.Builder(context.applicationContext)
