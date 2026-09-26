@@ -9,7 +9,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -89,7 +88,9 @@ private enum class MainTab { Home, Library, Stats }
 @Composable
 private fun isCompactWalkman(): Boolean {
     val width = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp
-    return WalkmanProfile.detect().isA300 || width <= 380
+    return remember(width) {
+        WalkmanProfile.detect().isA300 || width <= 380
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -134,7 +135,7 @@ private fun MuseWalkApp(vm: MainViewModel) {
         containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
             Column {
-                AnimatedVisibility(ui.current != null) {
+                if (ui.current != null) {
                     MiniPlayer(
                         track = ui.current,
                         isPlaying = ui.isPlaying,
@@ -171,11 +172,6 @@ private fun MuseWalkApp(vm: MainViewModel) {
         }
     ) { padding ->
         when {
-            ui.loading -> Box(
-                Modifier.fillMaxSize().padding(padding),
-                contentAlignment = Alignment.Center
-            ) { CircularProgressIndicator() }
-
             ui.error != null -> PermissionError(
                 text = ui.error ?: "読み込みエラー",
                 modifier = Modifier.padding(padding),
@@ -221,8 +217,12 @@ private fun HomeScreen(ui: HomeUiState, vm: MainViewModel, modifier: Modifier = 
             }
         }
 
-        item {
-            A300AudioCard()
+        if (ui.loading) {
+            item {
+                LinearProgressIndicator(
+                    modifier = Modifier.fillMaxWidth().height(2.dp)
+                )
+            }
         }
 
         item {
@@ -252,7 +252,7 @@ private fun HomeScreen(ui: HomeUiState, vm: MainViewModel, modifier: Modifier = 
             SectionTitle("ジャンル")
             Spacer(Modifier.height(12.dp))
             LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                items(ui.genres) { genre ->
+                items(genres) { genre ->
                     AssistChip(
                         onClick = { vm.selectGenre(genre) },
                         label = { Text(genre) },
@@ -463,6 +463,8 @@ private fun TrackCarousel(items: List<RecommendedTrack>, onClick: (RecommendedTr
 @Composable
 private fun LibraryScreen(ui: HomeUiState, vm: MainViewModel, modifier: Modifier = Modifier) {
     val compact = isCompactWalkman()
+    val genres = remember(ui.tracks) { ui.genres }
+    val visibleTracks = remember(ui.tracks, ui.selectedGenre, ui.searchQuery) { ui.visibleTracks }
     Column(modifier.fillMaxSize()) {
         Column(
             Modifier.padding(
@@ -490,7 +492,7 @@ private fun LibraryScreen(ui: HomeUiState, vm: MainViewModel, modifier: Modifier
                         label = { Text("すべて") }
                     )
                 }
-                items(ui.genres) { genre ->
+                items(genres) { genre ->
                     FilterChip(
                         selected = ui.selectedGenre == genre,
                         onClick = { vm.selectGenre(genre) },
@@ -508,11 +510,11 @@ private fun LibraryScreen(ui: HomeUiState, vm: MainViewModel, modifier: Modifier
                 vertical = if (compact) 5.dp else 8.dp
             )
         ) {
-            items(ui.visibleTracks, key = { it.id }) { track ->
+            items(visibleTracks, key = { it.id }) { track ->
                 TrackRow(
                     track = track,
                     subtitle = track.artist + "  ·  " + track.genre,
-                    onClick = { vm.play(track, ui.visibleTracks) }
+                    onClick = { vm.play(track, visibleTracks) }
                 )
             }
             item { Spacer(Modifier.height(24.dp)) }
@@ -550,6 +552,9 @@ private fun StatsScreen(ui: HomeUiState, vm: MainViewModel, modifier: Modifier =
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 13.sp
             )
+        }
+        item {
+            A300AudioCard()
         }
         item { SectionTitle("よく聴く曲") }
         items(ranked.filter { it.second.playCount > 0 }.take(20), key = { it.first.id }) { (track, stats) ->
@@ -619,24 +624,26 @@ private fun TrackRow(track: Track, subtitle: String, onClick: () -> Unit) {
 
 @Composable
 private fun Artwork(track: Track, modifier: Modifier = Modifier) {
-    val palette = when (track.genre) {
-        "ボカロ" -> listOf(Color(0xFF45C3B8), Color(0xFF236C73))
-        "アニメ・ゲーム" -> listOf(Color(0xFF8D6BD8), Color(0xFF3F315F))
-        "洋楽" -> listOf(Color(0xFF4776E6), Color(0xFF31416B))
-        "J-POP" -> listOf(Color(0xFFF2709C), Color(0xFF8C385A))
-        "BGM" -> listOf(Color(0xFF667EEA), Color(0xFF39456F))
-        else -> listOf(Color(0xFF606C88), Color(0xFF30343F))
+    val color = remember(track.genre) {
+        when (track.genre) {
+            "ボカロ" -> Color(0xFF2F8F88)
+            "アニメ・ゲーム" -> Color(0xFF66519C)
+            "洋楽" -> Color(0xFF3D5FA8)
+            "J-POP" -> Color(0xFFB54E70)
+            "BGM" -> Color(0xFF4D5DA7)
+            else -> Color(0xFF4D5361)
+        }
     }
     Box(
         modifier
-            .clip(RoundedCornerShape(18.dp))
-            .background(Brush.linearGradient(palette)),
+            .clip(RoundedCornerShape(15.dp))
+            .background(color),
         contentAlignment = Alignment.Center
     ) {
         Text(
             track.title.take(1).uppercase(),
-            color = Color.White.copy(alpha = 0.88f),
-            fontSize = 28.sp,
+            color = Color.White.copy(alpha = 0.92f),
+            fontSize = 25.sp,
             fontWeight = FontWeight.Bold
         )
     }
@@ -658,8 +665,8 @@ private fun MiniPlayer(
             .padding(horizontal = if (compact) 6.dp else 8.dp)
             .clip(RoundedCornerShape(if (compact) 15.dp else 18.dp))
             .clickable(onClick = onClick),
-        tonalElevation = 6.dp,
-        shadowElevation = 10.dp
+        tonalElevation = 1.dp,
+        shadowElevation = 0.dp
     ) {
         Row(
             Modifier.padding(if (compact) 5.dp else 8.dp),
@@ -698,9 +705,9 @@ private fun NowPlayingScreen(
             .navigationBarsPadding()
     ) {
         val artworkSize = if (compact) {
-            minOf(maxWidth * 0.68f, maxHeight * 0.31f)
+            minOf(maxWidth * 0.58f, maxHeight * 0.26f)
         } else {
-            minOf(maxWidth * 0.76f, maxHeight * 0.40f)
+            minOf(maxWidth * 0.74f, maxHeight * 0.38f)
         }
 
         Column(
@@ -745,13 +752,13 @@ private fun NowPlayingScreen(
                     .clip(RoundedCornerShape(if (compact) 24.dp else 30.dp))
             )
 
-            Spacer(Modifier.height(if (compact) 18.dp else 28.dp))
+            Spacer(Modifier.height(if (compact) 12.dp else 28.dp))
 
             Text(
                 text = track.title,
                 modifier = Modifier.fillMaxWidth(),
-                fontSize = if (compact) 19.sp else 24.sp,
-                lineHeight = if (compact) 23.sp else 29.sp,
+                fontSize = if (compact) 17.sp else 24.sp,
+                lineHeight = if (compact) 20.sp else 29.sp,
                 fontWeight = FontWeight.Bold,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
@@ -763,7 +770,7 @@ private fun NowPlayingScreen(
                 text = track.artist,
                 modifier = Modifier.fillMaxWidth(),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontSize = if (compact) 13.sp else 15.sp,
+                fontSize = if (compact) 12.sp else 15.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -773,7 +780,7 @@ private fun NowPlayingScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(if (compact) 82.dp else 96.dp),
+                    .height(if (compact) 74.dp else 96.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -790,13 +797,13 @@ private fun NowPlayingScreen(
 
                 FilledIconButton(
                     onClick = onToggle,
-                    modifier = Modifier.size(if (compact) 66.dp else 74.dp),
+                    modifier = Modifier.size(if (compact) 62.dp else 74.dp),
                     shape = CircleShape
                 ) {
                     Icon(
                         if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                         contentDescription = if (isPlaying) "一時停止" else "再生",
-                        modifier = Modifier.size(if (compact) 34.dp else 40.dp)
+                        modifier = Modifier.size(if (compact) 32.dp else 40.dp)
                     )
                 }
 
@@ -821,14 +828,6 @@ private fun NowPlayingScreen(
 
             Spacer(Modifier.height(if (compact) 10.dp else 18.dp))
         }
-    }
-}
-
-@Composable
-private fun SmallMetric(label: String, value: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(value, fontWeight = FontWeight.Bold)
-        Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
     }
 }
 
