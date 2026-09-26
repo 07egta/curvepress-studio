@@ -187,7 +187,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun next() {
         val player = ensurePlayer()
         val listened = System.currentTimeMillis() - activeStartedAt
-        if (activeTrackId != null && listened in 0 until 45_000) {
+        if (activeTrackId != null && listened >= 0L && listened < 45_000L) {
             stats.markSkipped(activeTrackId!!, listened)
         }
         player.seekToNextMediaItem()
