@@ -50,6 +50,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun MuseWalkTheme(content: @Composable () -> Unit) {
     val dark = androidx.compose.foundation.isSystemInDarkTheme()
+    val compact = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp <= 380
     val light = lightColorScheme(
         primary = Color(0xFF111111),
         onPrimary = Color.White,
@@ -72,7 +73,7 @@ private fun MuseWalkTheme(content: @Composable () -> Unit) {
         colorScheme = if (dark) darkScheme else light,
         typography = Typography(
             headlineLarge = MaterialTheme.typography.headlineLarge.copy(
-                fontSize = 34.sp,
+                fontSize = if (compact) 29.sp else 34.sp,
                 fontWeight = FontWeight.Bold,
                 letterSpacing = (-0.8).sp
             ),
@@ -122,24 +123,28 @@ private fun MuseWalkApp(vm: MainViewModel) {
                         onNext = vm::next
                     )
                 }
-                NavigationBar(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f)) {
+                val compact = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp <= 380
+                NavigationBar(
+                    modifier = Modifier.height(if (compact) 64.dp else 80.dp),
+                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f)
+                ) {
                     NavigationBarItem(
                         selected = tab == MainTab.Home,
                         onClick = { tab = MainTab.Home },
-                        icon = { Icon(Icons.Default.Home, null) },
-                        label = { Text("ホーム") }
+                        icon = { Icon(Icons.Default.Home, null, Modifier.size(if (compact) 22.dp else 24.dp)) },
+                        label = { Text("ホーム", fontSize = if (compact) 10.sp else 12.sp) }
                     )
                     NavigationBarItem(
                         selected = tab == MainTab.Library,
                         onClick = { tab = MainTab.Library },
-                        icon = { Icon(Icons.Default.LibraryMusic, null) },
-                        label = { Text("ライブラリ") }
+                        icon = { Icon(Icons.Default.LibraryMusic, null, Modifier.size(if (compact) 22.dp else 24.dp)) },
+                        label = { Text("ライブラリ", fontSize = if (compact) 10.sp else 12.sp) }
                     )
                     NavigationBarItem(
                         selected = tab == MainTab.Stats,
                         onClick = { tab = MainTab.Stats },
-                        icon = { Icon(Icons.Default.BarChart, null) },
-                        label = { Text("統計") }
+                        icon = { Icon(Icons.Default.BarChart, null, Modifier.size(if (compact) 22.dp else 24.dp)) },
+                        label = { Text("統計", fontSize = if (compact) 10.sp else 12.sp) }
                     )
                 }
             }
@@ -184,6 +189,7 @@ private fun MuseWalkApp(vm: MainViewModel) {
 
 @Composable
 private fun HomeScreen(ui: HomeUiState, vm: MainViewModel, modifier: Modifier = Modifier) {
+    val compact = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp <= 380
     val recentFavorites = remember(ui.tracks, ui.recommendations) {
         ui.recommendations.filter { it.reason.contains("最後まで") || it.reason.contains("履歴") }.take(8)
     }
@@ -193,15 +199,19 @@ private fun HomeScreen(ui: HomeUiState, vm: MainViewModel, modifier: Modifier = 
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(24.dp)
+        contentPadding = PaddingValues(
+            horizontal = if (compact) 14.dp else 20.dp,
+            vertical = if (compact) 10.dp else 16.dp
+        ),
+        verticalArrangement = Arrangement.spacedBy(if (compact) 16.dp else 24.dp)
     ) {
         item {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text("MuseWalk", style = MaterialTheme.typography.headlineLarge)
                 Text(
                     "聴くほど、あなた向けに。",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = if (compact) 13.sp else 14.sp
                 )
             }
         }
@@ -258,22 +268,23 @@ private fun HomeScreen(ui: HomeUiState, vm: MainViewModel, modifier: Modifier = 
 
 @Composable
 private fun HeroRecommendation(item: RecommendedTrack?, onPlay: () -> Unit) {
+    val compact = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp <= 380
     val track = item?.track
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(30.dp),
+        shape = RoundedCornerShape(if (compact) 24.dp else 30.dp),
         colors = CardDefaults.cardColors(containerColor = Color.Transparent)
     ) {
         Box(
             Modifier
                 .fillMaxWidth()
-                .height(250.dp)
+                .height(if (compact) 184.dp else 250.dp)
                 .background(
                     Brush.linearGradient(
                         listOf(Color(0xFF232526), Color(0xFF5D5D62), Color(0xFF1B1B1D))
                     )
                 )
-                .padding(24.dp)
+                .padding(if (compact) 16.dp else 24.dp)
         ) {
             Column(
                 Modifier.fillMaxSize(),
@@ -286,7 +297,10 @@ private fun HeroRecommendation(item: RecommendedTrack?, onPlay: () -> Unit) {
                     Text(
                         "今の俺向け",
                         color = Color.White,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                        modifier = Modifier.padding(
+                            horizontal = if (compact) 10.dp else 12.dp,
+                            vertical = if (compact) 5.dp else 7.dp
+                        ),
                         fontWeight = FontWeight.SemiBold
                     )
                 }
@@ -294,16 +308,28 @@ private fun HeroRecommendation(item: RecommendedTrack?, onPlay: () -> Unit) {
                     Text(
                         track?.title ?: "曲を読み込むとおすすめが出ます",
                         color = Color.White,
-                        fontSize = 27.sp,
+                        fontSize = if (compact) 22.sp else 27.sp,
                         fontWeight = FontWeight.Bold,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
                     if (track != null) {
                         Spacer(Modifier.height(4.dp))
-                        Text(track.artist, color = Color.White.copy(alpha = 0.72f))
-                        Text(item.reason, color = Color.White.copy(alpha = 0.62f), fontSize = 13.sp)
-                        Spacer(Modifier.height(18.dp))
+                        Text(
+                            track.artist,
+                            color = Color.White.copy(alpha = 0.72f),
+                            fontSize = if (compact) 13.sp else 14.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            item.reason,
+                            color = Color.White.copy(alpha = 0.62f),
+                            fontSize = if (compact) 11.sp else 13.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(Modifier.height(if (compact) 9.dp else 18.dp))
                         FilledTonalButton(
                             onClick = onPlay,
                             colors = ButtonDefaults.filledTonalButtonColors(
@@ -324,15 +350,17 @@ private fun HeroRecommendation(item: RecommendedTrack?, onPlay: () -> Unit) {
 
 @Composable
 private fun TrackCarousel(items: List<RecommendedTrack>, onClick: (RecommendedTrack) -> Unit) {
-    LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+    val compact = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp <= 380
+    val itemSize = if (compact) 116.dp else 148.dp
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(if (compact) 10.dp else 14.dp)) {
         items(items, key = { it.track.id }) { item ->
             Column(
                 Modifier
-                    .width(148.dp)
+                    .width(itemSize)
                     .clickable { onClick(item) }
             ) {
-                Artwork(item.track, Modifier.size(148.dp))
-                Spacer(Modifier.height(9.dp))
+                Artwork(item.track, Modifier.size(itemSize))
+                Spacer(Modifier.height(if (compact) 6.dp else 9.dp))
                 Text(
                     item.track.title,
                     fontWeight = FontWeight.SemiBold,
@@ -342,7 +370,7 @@ private fun TrackCarousel(items: List<RecommendedTrack>, onClick: (RecommendedTr
                 Text(
                     item.track.artist,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 13.sp,
+                    fontSize = if (compact) 11.sp else 13.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -354,10 +382,16 @@ private fun TrackCarousel(items: List<RecommendedTrack>, onClick: (RecommendedTr
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun LibraryScreen(ui: HomeUiState, vm: MainViewModel, modifier: Modifier = Modifier) {
+    val compact = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp <= 380
     Column(modifier.fillMaxSize()) {
-        Column(Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
+        Column(
+            Modifier.padding(
+                horizontal = if (compact) 14.dp else 20.dp,
+                vertical = if (compact) 10.dp else 16.dp
+            )
+        ) {
             Text("ライブラリ", style = MaterialTheme.typography.headlineLarge)
-            Spacer(Modifier.height(14.dp))
+            Spacer(Modifier.height(if (compact) 8.dp else 14.dp))
             OutlinedTextField(
                 value = ui.searchQuery,
                 onValueChange = vm::search,
@@ -367,8 +401,8 @@ private fun LibraryScreen(ui: HomeUiState, vm: MainViewModel, modifier: Modifier
                 placeholder = { Text("曲、アーティスト、アルバムを検索") },
                 leadingIcon = { Icon(Icons.Default.Search, null) }
             )
-            Spacer(Modifier.height(12.dp))
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Spacer(Modifier.height(if (compact) 8.dp else 12.dp))
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(if (compact) 6.dp else 8.dp)) {
                 item {
                     FilterChip(
                         selected = ui.selectedGenre == null,
@@ -389,7 +423,10 @@ private fun LibraryScreen(ui: HomeUiState, vm: MainViewModel, modifier: Modifier
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
 
         LazyColumn(
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+            contentPadding = PaddingValues(
+                horizontal = if (compact) 10.dp else 16.dp,
+                vertical = if (compact) 5.dp else 8.dp
+            )
         ) {
             items(ui.visibleTracks, key = { it.id }) { track ->
                 TrackRow(
@@ -405,6 +442,7 @@ private fun LibraryScreen(ui: HomeUiState, vm: MainViewModel, modifier: Modifier
 
 @Composable
 private fun StatsScreen(ui: HomeUiState, vm: MainViewModel, modifier: Modifier = Modifier) {
+    val compact = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp <= 380
     val ranked = remember(ui.tracks, ui.recommendations) {
         ui.tracks.map { it to vm.statsFor(it) }.sortedByDescending { it.second.playCount }
     }
@@ -413,8 +451,11 @@ private fun StatsScreen(ui: HomeUiState, vm: MainViewModel, modifier: Modifier =
 
     LazyColumn(
         modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(18.dp)
+        contentPadding = PaddingValues(
+            horizontal = if (compact) 14.dp else 20.dp,
+            vertical = if (compact) 10.dp else 16.dp
+        ),
+        verticalArrangement = Arrangement.spacedBy(if (compact) 12.dp else 18.dp)
     ) {
         item { Text("統計", style = MaterialTheme.typography.headlineLarge) }
         item {
@@ -451,37 +492,39 @@ private fun StatsScreen(ui: HomeUiState, vm: MainViewModel, modifier: Modifier =
 
 @Composable
 private fun MetricCard(label: String, value: String, modifier: Modifier = Modifier) {
+    val compact = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp <= 380
     Card(
         modifier = modifier,
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(if (compact) 18.dp else 24.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
-        Column(Modifier.padding(18.dp)) {
+        Column(Modifier.padding(if (compact) 13.dp else 18.dp)) {
             Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
             Spacer(Modifier.height(8.dp))
-            Text(value, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+            Text(value, fontSize = if (compact) 20.sp else 24.sp, fontWeight = FontWeight.Bold)
         }
     }
 }
 
 @Composable
 private fun TrackRow(track: Track, subtitle: String, onClick: () -> Unit) {
+    val compact = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp <= 380
     Row(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
+            .clip(RoundedCornerShape(if (compact) 14.dp else 18.dp))
             .clickable(onClick = onClick)
-            .padding(8.dp),
+            .padding(if (compact) 5.dp else 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Artwork(track, Modifier.size(58.dp))
-        Spacer(Modifier.width(12.dp))
+        Artwork(track, Modifier.size(if (compact) 50.dp else 58.dp))
+        Spacer(Modifier.width(if (compact) 9.dp else 12.dp))
         Column(Modifier.weight(1f)) {
             Text(track.title, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
                 subtitle,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontSize = 13.sp,
+                fontSize = if (compact) 11.5.sp else 13.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -528,21 +571,22 @@ private fun MiniPlayer(
     onNext: () -> Unit
 ) {
     if (track == null) return
+    val compact = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp <= 380
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 8.dp)
-            .clip(RoundedCornerShape(18.dp))
+            .padding(horizontal = if (compact) 6.dp else 8.dp)
+            .clip(RoundedCornerShape(if (compact) 15.dp else 18.dp))
             .clickable(onClick = onClick),
         tonalElevation = 6.dp,
         shadowElevation = 10.dp
     ) {
         Row(
-            Modifier.padding(8.dp),
+            Modifier.padding(if (compact) 5.dp else 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Artwork(track, Modifier.size(48.dp))
-            Spacer(Modifier.width(10.dp))
+            Artwork(track, Modifier.size(if (compact) 42.dp else 48.dp))
+            Spacer(Modifier.width(if (compact) 8.dp else 10.dp))
             Column(Modifier.weight(1f)) {
                 Text(track.title, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold)
                 Text(track.artist, maxLines = 1, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
@@ -564,39 +608,60 @@ private fun NowPlayingSheet(
     onToggle: () -> Unit,
     onNext: () -> Unit
 ) {
+    val compact = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp <= 380
     Column(
         Modifier
             .fillMaxWidth()
-            .padding(horizontal = 28.dp, vertical = 10.dp),
+            .padding(
+                horizontal = if (compact) 22.dp else 28.dp,
+                vertical = if (compact) 6.dp else 10.dp
+            ),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Artwork(track, Modifier.fillMaxWidth().aspectRatio(1f))
-        Spacer(Modifier.height(28.dp))
+        Artwork(
+            track,
+            if (compact) Modifier.size(210.dp) else Modifier.fillMaxWidth().aspectRatio(1f)
+        )
+        Spacer(Modifier.height(if (compact) 16.dp else 28.dp))
         Text(track.title, style = MaterialTheme.typography.titleLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
         Text(track.artist, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(Modifier.height(26.dp))
+        Spacer(Modifier.height(if (compact) 16.dp else 26.dp))
         Row(
             Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = onPrevious, modifier = Modifier.size(58.dp)) {
-                Icon(Icons.Default.SkipPrevious, null, Modifier.size(34.dp))
+            IconButton(
+                onClick = onPrevious,
+                modifier = Modifier.size(if (compact) 52.dp else 58.dp)
+            ) {
+                Icon(Icons.Default.SkipPrevious, null, Modifier.size(if (compact) 30.dp else 34.dp))
             }
-            FilledIconButton(onClick = onToggle, modifier = Modifier.size(72.dp), shape = CircleShape) {
-                Icon(if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow, null, Modifier.size(38.dp))
+            FilledIconButton(
+                onClick = onToggle,
+                modifier = Modifier.size(if (compact) 64.dp else 72.dp),
+                shape = CircleShape
+            ) {
+                Icon(
+                    if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                    null,
+                    Modifier.size(if (compact) 34.dp else 38.dp)
+                )
             }
-            IconButton(onClick = onNext, modifier = Modifier.size(58.dp)) {
-                Icon(Icons.Default.SkipNext, null, Modifier.size(34.dp))
+            IconButton(
+                onClick = onNext,
+                modifier = Modifier.size(if (compact) 52.dp else 58.dp)
+            ) {
+                Icon(Icons.Default.SkipNext, null, Modifier.size(if (compact) 30.dp else 34.dp))
             }
         }
-        Spacer(Modifier.height(20.dp))
+        Spacer(Modifier.height(if (compact) 12.dp else 20.dp))
         Surface(
             shape = RoundedCornerShape(22.dp),
             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
         ) {
             Row(
-                Modifier.fillMaxWidth().padding(18.dp),
+                Modifier.fillMaxWidth().padding(if (compact) 12.dp else 18.dp),
                 horizontalArrangement = Arrangement.SpaceAround
             ) {
                 SmallMetric("再生", "${stats.playCount}回")
@@ -604,7 +669,7 @@ private fun NowPlayingSheet(
                 SmallMetric("スキップ", "${(stats.skipRate * 100).toInt()}%")
             }
         }
-        Spacer(Modifier.height(30.dp))
+        Spacer(Modifier.height(if (compact) 16.dp else 30.dp))
     }
 }
 
@@ -636,7 +701,12 @@ private fun PermissionError(text: String, modifier: Modifier = Modifier, onRetry
 
 @Composable
 private fun SectionTitle(text: String) {
-    Text(text, style = MaterialTheme.typography.titleLarge)
+    val compact = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp <= 380
+    Text(
+        text,
+        style = MaterialTheme.typography.titleLarge,
+        fontSize = if (compact) 20.sp else MaterialTheme.typography.titleLarge.fontSize
+    )
 }
 
 private fun formatDuration(ms: Long): String {
