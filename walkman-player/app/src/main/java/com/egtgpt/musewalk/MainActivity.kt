@@ -4,6 +4,7 @@ import android.Manifest
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -116,6 +117,19 @@ private fun MuseWalkApp(vm: MainViewModel) {
         }
     }
 
+    if (showNowPlaying && ui.current != null) {
+        BackHandler { showNowPlaying = false }
+        NowPlayingScreen(
+            track = ui.current!!,
+            isPlaying = ui.isPlaying,
+            onBack = { showNowPlaying = false },
+            onPrevious = vm::previous,
+            onToggle = vm::togglePlayPause,
+            onNext = vm::next
+        )
+        return
+    }
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
@@ -176,21 +190,6 @@ private fun MuseWalkApp(vm: MainViewModel) {
         }
     }
 
-    if (showNowPlaying && ui.current != null) {
-        ModalBottomSheet(
-            onDismissRequest = { showNowPlaying = false },
-            dragHandle = { BottomSheetDefaults.DragHandle() }
-        ) {
-            NowPlayingSheet(
-                track = ui.current!!,
-                isPlaying = ui.isPlaying,
-                stats = vm.statsFor(ui.current!!),
-                onPrevious = vm::previous,
-                onToggle = vm::togglePlayPause,
-                onNext = vm::next
-            )
-        }
-    }
 }
 
 @Composable
@@ -681,76 +680,147 @@ private fun MiniPlayer(
 }
 
 @Composable
-private fun NowPlayingSheet(
+private fun NowPlayingScreen(
     track: Track,
     isPlaying: Boolean,
-    stats: TrackStats,
+    onBack: () -> Unit,
     onPrevious: () -> Unit,
     onToggle: () -> Unit,
     onNext: () -> Unit
 ) {
     val compact = isCompactWalkman()
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .padding(
-                horizontal = if (compact) 22.dp else 28.dp,
-                vertical = if (compact) 6.dp else 10.dp
-            ),
-        horizontalAlignment = Alignment.CenterHorizontally
+
+    BoxWithConstraints(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .statusBarsPadding()
+            .navigationBarsPadding()
     ) {
-        Artwork(
-            track,
-            if (compact) Modifier.size(210.dp) else Modifier.fillMaxWidth().aspectRatio(1f)
-        )
-        Spacer(Modifier.height(if (compact) 16.dp else 28.dp))
-        Text(track.title, style = MaterialTheme.typography.titleLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
-        Text(track.artist, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(Modifier.height(if (compact) 16.dp else 26.dp))
-        Row(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(
-                onClick = onPrevious,
-                modifier = Modifier.size(if (compact) 52.dp else 58.dp)
-            ) {
-                Icon(Icons.Default.SkipPrevious, null, Modifier.size(if (compact) 30.dp else 34.dp))
-            }
-            FilledIconButton(
-                onClick = onToggle,
-                modifier = Modifier.size(if (compact) 64.dp else 72.dp),
-                shape = CircleShape
-            ) {
-                Icon(
-                    if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                    null,
-                    Modifier.size(if (compact) 34.dp else 38.dp)
-                )
-            }
-            IconButton(
-                onClick = onNext,
-                modifier = Modifier.size(if (compact) 52.dp else 58.dp)
-            ) {
-                Icon(Icons.Default.SkipNext, null, Modifier.size(if (compact) 30.dp else 34.dp))
-            }
+        val artworkSize = if (compact) {
+            minOf(maxWidth * 0.68f, maxHeight * 0.31f)
+        } else {
+            minOf(maxWidth * 0.76f, maxHeight * 0.40f)
         }
-        Spacer(Modifier.height(if (compact) 12.dp else 20.dp))
-        Surface(
-            shape = RoundedCornerShape(22.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = if (compact) 18.dp else 28.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Row(
-                Modifier.fillMaxWidth().padding(if (compact) 12.dp else 18.dp),
-                horizontalArrangement = Arrangement.SpaceAround
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(if (compact) 48.dp else 56.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                SmallMetric("再生", "${stats.playCount}回")
-                SmallMetric("完走", "${(stats.completionRate * 100).toInt()}%")
-                SmallMetric("スキップ", "${(stats.skipRate * 100).toInt()}%")
+                IconButton(
+                    onClick = onBack,
+                    modifier = Modifier.size(48.dp)
+                ) {
+                    Icon(
+                        Icons.Default.KeyboardArrowDown,
+                        contentDescription = "閉じる",
+                        modifier = Modifier.size(30.dp)
+                    )
+                }
+                Spacer(Modifier.weight(1f))
+                Text(
+                    "再生中",
+                    fontSize = if (compact) 12.sp else 14.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(Modifier.weight(1f))
+                Spacer(Modifier.size(48.dp))
             }
+
+            Spacer(Modifier.height(if (compact) 6.dp else 14.dp))
+
+            Artwork(
+                track,
+                Modifier
+                    .size(artworkSize)
+                    .clip(RoundedCornerShape(if (compact) 24.dp else 30.dp))
+            )
+
+            Spacer(Modifier.height(if (compact) 18.dp else 28.dp))
+
+            Text(
+                text = track.title,
+                modifier = Modifier.fillMaxWidth(),
+                fontSize = if (compact) 19.sp else 24.sp,
+                lineHeight = if (compact) 23.sp else 29.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            Spacer(Modifier.height(4.dp))
+
+            Text(
+                text = track.artist,
+                modifier = Modifier.fillMaxWidth(),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = if (compact) 13.sp else 15.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            Spacer(Modifier.weight(1f))
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(if (compact) 82.dp else 96.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(
+                    onClick = onPrevious,
+                    modifier = Modifier.size(52.dp)
+                ) {
+                    Icon(
+                        Icons.Default.SkipPrevious,
+                        contentDescription = "前の曲",
+                        modifier = Modifier.size(31.dp)
+                    )
+                }
+
+                FilledIconButton(
+                    onClick = onToggle,
+                    modifier = Modifier.size(if (compact) 66.dp else 74.dp),
+                    shape = CircleShape
+                ) {
+                    Icon(
+                        if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        contentDescription = if (isPlaying) "一時停止" else "再生",
+                        modifier = Modifier.size(if (compact) 34.dp else 40.dp)
+                    )
+                }
+
+                IconButton(
+                    onClick = onNext,
+                    modifier = Modifier.size(52.dp)
+                ) {
+                    Icon(
+                        Icons.Default.SkipNext,
+                        contentDescription = "次の曲",
+                        modifier = Modifier.size(31.dp)
+                    )
+                }
+            }
+
+            Text(
+                text = track.genre + "  ·  " + formatDuration(track.durationMs),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = if (compact) 11.sp else 12.sp,
+                maxLines = 1
+            )
+
+            Spacer(Modifier.height(if (compact) 10.dp else 18.dp))
         }
-        Spacer(Modifier.height(if (compact) 16.dp else 30.dp))
     }
 }
 
