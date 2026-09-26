@@ -2,6 +2,8 @@ package com.egtgpt.musewalk
 
 import android.content.Context
 import android.content.Intent
+import androidx.media3.common.AudioAttributes
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.exoplayer.ExoPlayer
@@ -11,7 +13,17 @@ object PlayerManager {
 
     fun get(context: Context): ExoPlayer =
         player ?: synchronized(this) {
-            player ?: ExoPlayer.Builder(context.applicationContext).build().also { player = it }
+            player ?: ExoPlayer.Builder(context.applicationContext)
+                .setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(C.USAGE_MEDIA)
+                        .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
+                        .build(),
+                    true
+                )
+                .setHandleAudioBecomingNoisy(true)
+                .build()
+                .also { player = it }
         }
 
     fun play(context: Context, tracks: List<Track>, startIndex: Int) {
