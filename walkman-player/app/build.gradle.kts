@@ -12,8 +12,8 @@ android {
         applicationId = "com.egtgpt.musewalk.player"
         minSdk = 28
         targetSdk = 35
-        versionCode = 8
-        versionName = "0.5.3"
+        versionCode = 9
+        versionName = "0.5.4"
     }
 
     buildFeatures { compose = true }
