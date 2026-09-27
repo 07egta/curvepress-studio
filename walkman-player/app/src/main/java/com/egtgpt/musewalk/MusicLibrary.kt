@@ -75,37 +75,41 @@ class MusicLibrary(private val context: Context) {
         album: String
     ): String {
         normalizeGenreTag(rawGenre)?.let { return it }
+
+        val normalizedPath = path.lowercase()
+        if (containsAny(normalizedPath, "要確認", "needs review")) return "ジャンル未設定"
         inferGenreFromPath(path)?.let { return it }
 
         val details = "$title $artist $album".lowercase()
         return when {
-            containsAny(details, "ボカロ", "vocaloid", "初音ミク", "鏡音", "巡音", "重音テト", "synthesizer v") ->
-                "ボカロ"
+            containsAny(details, "ボカロ", "初音ミク", "鏡音", "巡音", "重音テト", "合成音声") ||
+                containsLatinWord(details, "vocaloid") || "synthesizer v" in details -> "ボカロ"
+            containsAny(details, "背景音楽", "作業用", "睡眠", "リラックス", "lo-fi", "background music") ||
+                listOf("bgm", "relax", "meditation", "study", "sleep", "ambient", "lofi")
+                    .any { containsLatinWord(details, it) } -> "BGM"
             containsAny(
                 details,
-                "bgm", "背景音楽", "作業用", "睡眠", "リラックス", "relax", "meditation",
-                "study", "sleep", "ambient", "lofi", "lo-fi"
-            ) -> "BGM"
-            containsAny(
-                details,
-                "アニソン", "アニメ", "anime", "ゲーム音楽", "ゲーム", "game soundtrack",
-                "soundtrack", "サウンドトラック", "主題歌", "オープニング", "エンディング"
-            ) || containsLatinWord(details, "ost") -> "アニメ・ゲーム"
-            containsAny(details, "クラシック", "classical music", "classical", "交響曲", "ピアノソナタ") ->
-                "クラシック"
-            containsAny(details, "ジャズ", "jazz", "swing") -> "ジャズ"
-            containsAny(details, "ヒップホップ", "hip hop", "hip-hop", "rap", "ラップ") ->
+                "アニソン", "アニメ", "ゲーム音楽", "サウンドトラック", "主題歌", "オープニング", "エンディング"
+            ) || listOf("anime", "game", "soundtrack", "ost").any { containsLatinWord(details, it) } ->
+                "アニメ・ゲーム"
+            containsAny(details, "クラシック", "交響曲", "ピアノソナタ") ||
+                listOf("classical", "symphony").any { containsLatinWord(details, it) } -> "クラシック"
+            containsAny(details, "ジャズ") ||
+                listOf("jazz", "swing").any { containsLatinWord(details, it) } -> "ジャズ"
+            containsAny(details, "ヒップホップ", "ラップ") ||
+                listOf("hip hop", "hip-hop", "hiphop", "rap").any { containsLatinWord(details, it) } ->
                 "ヒップホップ"
-            containsAny(details, "r&b", "rnb", "ソウル", "soul") -> "R&B・ソウル"
-            containsAny(details, "edm", "electronic", "電子音楽", "ダンスミュージック") ->
-                "電子音楽"
+            containsAny(details, "r&b", "ソウル") ||
+                listOf("rnb", "soul").any { containsLatinWord(details, it) } -> "R&B・ソウル"
+            containsAny(details, "電子音楽", "ダンスミュージック") ||
+                listOf("edm", "electronic").any { containsLatinWord(details, it) } -> "電子音楽"
             containsAny(details, "j-pop", "jpop", "邦楽") -> "J-POP"
-            containsAny(details, "ロック", "rock", "punk", "パンク", "metal", "メタル") ->
-                "ロック"
-            containsAny(details, "ポップ", "pop music") || containsLatinWord(details, "pop") ->
-                "ポップ"
-            containsAny(details, "ブルース", "blues") -> "ブルース"
-            containsAny(details, "フォーク", "folk", "カントリー", "country") -> "フォーク"
+            containsAny(details, "ロック", "パンク", "メタル") ||
+                listOf("rock", "punk", "metal").any { containsLatinWord(details, it) } -> "ロック"
+            containsAny(details, "ポップ", "pop music") || containsLatinWord(details, "pop") -> "ポップ"
+            containsAny(details, "ブルース") || containsLatinWord(details, "blues") -> "ブルース"
+            containsAny(details, "フォーク", "カントリー") ||
+                listOf("folk", "country").any { containsLatinWord(details, it) } -> "フォーク"
             else -> "ジャンル未設定"
         }
     }
@@ -115,14 +119,16 @@ class MusicLibrary(private val context: Context) {
         if (containsAny(normalized, "その他", "要確認", "needs review")) return null
 
         return when {
-            containsAny(normalized, "ボカロ", "vocaloid", "合成音声") -> "ボカロ"
-            containsAny(normalized, "j-pop", "jpop", "邦楽") -> "J-POP"
+            containsAny(normalized, "ボカロ", "合成音声") ||
+                containsLatinWord(normalized, "vocaloid") -> "ボカロ"
+            containsAny(normalized, "j-pop", "邦楽") ||
+                containsLatinWord(normalized, "jpop") -> "J-POP"
             "洋楽" in normalized -> "洋楽"
-            containsAny(normalized, "アニメ", "映画音楽", "anime", "サウンドトラック") ->
-                "アニメ・ゲーム"
-            containsAny(normalized, "ゲーム", "game") -> "アニメ・ゲーム"
+            containsAny(normalized, "アニメ", "映画音楽", "サウンドトラック") ||
+                containsLatinWord(normalized, "anime") -> "アニメ・ゲーム"
+            "ゲーム" in normalized || containsLatinWord(normalized, "game") -> "アニメ・ゲーム"
             containsAny(normalized, "bgm", "背景音楽") -> "BGM"
-            containsAny(normalized, "クラシック", "classical") -> "クラシック"
+            "クラシック" in normalized || containsLatinWord(normalized, "classical") -> "クラシック"
             else -> null
         }
     }
