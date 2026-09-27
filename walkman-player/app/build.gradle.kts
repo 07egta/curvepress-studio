@@ -9,7 +9,7 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.egtgpt.musewalk"
+        applicationId = "com.egtgpt.musewalk.player"
         minSdk = 28
         targetSdk = 35
         versionCode = 6
