@@ -27,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -140,11 +141,20 @@ private fun MuseWalkApp(vm: MainViewModel) {
         QueueScreen(
             queue = ui.queue,
             currentIndex = ui.queueIndex,
+            repeatMode = ui.repeatMode,
+            shuffleEnabled = ui.shuffleEnabled,
+            continuousPlayback = ui.continuousPlayback,
             onBack = { showQueue = false },
             onSelect = {
                 vm.playQueueIndex(it)
                 showQueue = false
-            }
+            },
+            onPlayNext = vm::playNextQueueItem,
+            onMove = vm::moveQueueItem,
+            onRemove = vm::removeQueueItem,
+            onShuffle = vm::toggleShuffle,
+            onRepeat = vm::cycleRepeatMode,
+            onContinuous = vm::toggleContinuousPlayback
         )
         return
     }
@@ -167,13 +177,19 @@ private fun MuseWalkApp(vm: MainViewModel) {
             positionMs = ui.playbackPositionMs,
             durationMs = ui.playbackDurationMs,
             isFavorite = ui.current!!.id in ui.favorites,
+            repeatMode = ui.repeatMode,
+            shuffleEnabled = ui.shuffleEnabled,
+            continuousPlayback = ui.continuousPlayback,
             onBack = { showNowPlaying = false },
             onPrevious = vm::previous,
             onToggle = vm::togglePlayPause,
             onNext = vm::next,
             onFavorite = { vm.toggleFavorite(ui.current!!) },
             onSeek = vm::seekTo,
-            onQueue = { showQueue = true }
+            onQueue = { showQueue = true },
+            onShuffle = vm::toggleShuffle,
+            onRepeat = vm::cycleRepeatMode,
+            onContinuous = vm::toggleContinuousPlayback
         )
         return
     }
