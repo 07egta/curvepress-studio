@@ -507,7 +507,7 @@ private fun HeroRecommendation(item: RecommendedTrack?, onPlay: () -> Unit) {
         Box(
             Modifier
                 .fillMaxWidth()
-                .height(if (compact) 184.dp else 250.dp)
+                .height(if (compact) 220.dp else 250.dp)
                 .background(
                     Brush.linearGradient(
                         listOf(Color(0xFF232526), Color(0xFF5D5D62), Color(0xFF1B1B1D))
@@ -646,15 +646,27 @@ private fun LibraryScreen(ui: HomeUiState, vm: MainViewModel, modifier: Modifier
                         )
                     }
                 } else {
-                    Text("ライブラリ", style = MaterialTheme.typography.headlineLarge)
+                    Text(
+                        "ライブラリ",
+                        style = MaterialTheme.typography.headlineLarge,
+                        fontSize = if (compact) 25.sp else MaterialTheme.typography.headlineLarge.fontSize
+                    )
                     Spacer(Modifier.height(if (compact) 8.dp else 14.dp))
                     OutlinedTextField(
                         value = ui.searchQuery,
                         onValueChange = vm::search,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().height(if (compact) 56.dp else 64.dp),
                         singleLine = true,
                         shape = RoundedCornerShape(18.dp),
-                        placeholder = { Text("曲、アーティスト、アルバムを検索") },
+                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = if (compact) 14.sp else 16.sp),
+                        placeholder = {
+                            Text(
+                                "曲やアーティストを検索",
+                                fontSize = if (compact) 13.sp else 15.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        },
                         leadingIcon = { Icon(Icons.Default.Search, null) }
                     )
                 }
