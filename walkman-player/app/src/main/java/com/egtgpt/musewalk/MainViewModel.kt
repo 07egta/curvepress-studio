@@ -189,13 +189,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         val list = if (source.any { it.id == track.id }) source else _ui.value.tracks
         val originalIndex = list.indexOfFirst { it.id == track.id }.coerceAtLeast(0)
 
-        // A300: cap the prepared queue to reduce allocation and MediaItem overhead.
-        val before = 12
-        val maxQueue = 60
-        val start = (originalIndex - before).coerceAtLeast(0)
-        val end = (start + maxQueue).coerceAtMost(list.size)
-        val queue = list.subList(start, end)
-        val queueIndex = originalIndex - start
+        // Keep the complete selected library or genre in the player queue so automatic
+        // playback can continue through every matching track.
+        val queue = list
+        val queueIndex = originalIndex
 
         viewModelScope.launch {
             val initialVolume = replayGain.volumeFor(track)
@@ -331,8 +328,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /**
-     * Called only while the full-screen player is visible.
-     * 1 Hz is deliberate: smooth enough for a music seekbar, much cheaper on A300.
+     * Called while the home player card or full-screen player is visible.
+     * 1 Hz keeps the seekbar current without frequent work on A300.
      */
     fun updateProgress() {
         val player = PlayerManager.peek() ?: return
