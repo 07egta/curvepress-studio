@@ -155,26 +155,28 @@ private fun MuseWalkApp(vm: MainViewModel) {
 
     if (showNowPlaying && !showQueue && ui.current != null) {
         BackHandler { showNowPlaying = false }
-        NowPlayingScreen(
-            track = ui.current!!,
-            isPlaying = ui.isPlaying,
-            positionMs = ui.playbackPositionMs,
-            durationMs = ui.playbackDurationMs,
-            isFavorite = ui.current!!.id in ui.favorites,
-            repeatMode = ui.repeatMode,
-            shuffleEnabled = ui.shuffleEnabled,
-            continuousPlayback = ui.continuousPlayback,
-            onBack = { showNowPlaying = false },
-            onPrevious = vm::previous,
-            onToggle = vm::togglePlayPause,
-            onNext = vm::next,
-            onFavorite = { vm.toggleFavorite(ui.current!!) },
-            onSeek = vm::seekTo,
-            onQueue = { showQueue = true },
-            onShuffle = vm::toggleShuffle,
-            onRepeat = vm::cycleRepeatMode,
-            onContinuous = vm::toggleContinuousPlayback
-        )
+        CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
+            NowPlayingScreen(
+                track = ui.current!!,
+                isPlaying = ui.isPlaying,
+                positionMs = ui.playbackPositionMs,
+                durationMs = ui.playbackDurationMs,
+                isFavorite = ui.current!!.id in ui.favorites,
+                repeatMode = ui.repeatMode,
+                shuffleEnabled = ui.shuffleEnabled,
+                continuousPlayback = ui.continuousPlayback,
+                onBack = { showNowPlaying = false },
+                onPrevious = vm::previous,
+                onToggle = vm::togglePlayPause,
+                onNext = vm::next,
+                onFavorite = { vm.toggleFavorite(ui.current!!) },
+                onSeek = vm::seekTo,
+                onQueue = { showQueue = true },
+                onShuffle = vm::toggleShuffle,
+                onRepeat = vm::cycleRepeatMode,
+                onContinuous = vm::toggleContinuousPlayback
+            )
+        }
         return
     }
 
@@ -295,7 +297,7 @@ private fun HomeScreen(
         ),
         verticalArrangement = Arrangement.spacedBy(if (compact) 16.dp else 24.dp)
     ) {
-        if (ui.current == null || !compact) {
+        if (!compact) {
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text("MuseWalk", style = MaterialTheme.typography.headlineLarge)

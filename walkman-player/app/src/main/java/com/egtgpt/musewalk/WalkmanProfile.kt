@@ -17,7 +17,8 @@ object WalkmanProfile {
     fun detect(): WalkmanAudioProfile {
         val model = Build.MODEL.orEmpty()
         val normalized = model.uppercase()
-        val isA300 = normalized.contains("NW-A306") ||
+        val isA300 = normalized.startsWith("NW-A300") ||
+            normalized.contains("NW-A306") ||
             normalized.contains("NW-A307") ||
             normalized.contains("A306") ||
             normalized.contains("A307")
