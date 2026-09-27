@@ -45,6 +45,13 @@ jobs:
             keytool -genkeypair -v               -keystore "$HOME/.android/debug.keystore"               -storepass android               -alias androiddebugkey               -keypass android               -keyalg RSA               -keysize 2048               -validity 10000               -dname "CN=MuseWalk Development,O=EGT GPT,C=JP"
           fi
 
+      - name: Report stable MuseWalk signing certificate
+        run: |
+          keytool -list -v \
+            -keystore "$HOME/.android/debug.keystore" \
+            -storepass android \
+            -alias androiddebugkey | grep -E 'SHA1:|SHA256:'
+
       - name: Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
