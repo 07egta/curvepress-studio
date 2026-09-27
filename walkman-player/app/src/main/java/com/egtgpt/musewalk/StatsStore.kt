@@ -1,13 +1,62 @@
 package com.egtgpt.musewalk
 
 import android.content.Context
+import android.util.Xml
 import org.json.JSONArray
 import org.json.JSONObject
+import org.xmlpull.v1.XmlPullParser
 import java.util.concurrent.ConcurrentHashMap
 
 class StatsStore(context: Context) {
     private val prefs = context.getSharedPreferences("musewalk_stats", Context.MODE_PRIVATE)
     private val cache = ConcurrentHashMap<Long, TrackStats>()
+
+    init {
+        importLegacyStatsIfAvailable(context)
+    }
+
+    private fun importLegacyStatsIfAvailable(context: Context) {
+        if (prefs.all.isNotEmpty()) return
+        val backup = context.getExternalFilesDir(null)?.resolve("musewalk_stats.xml") ?: return
+        if (!backup.isFile) return
+
+        val values = runCatching {
+            val parser = Xml.newPullParser()
+            backup.inputStream().buffered().use { input ->
+                parser.setInput(input, "UTF-8")
+                parser.nextTag()
+                parser.require(XmlPullParser.START_TAG, null, "map")
+                val imported = mutableMapOf<String, String>()
+                while (parser.next() != XmlPullParser.END_TAG) {
+                    if (parser.eventType == XmlPullParser.START_TAG) {
+                        if (parser.name == "string") {
+                            val key = parser.getAttributeValue(null, "name")
+                            val value = parser.nextText()
+                            if (key?.toLongOrNull() != null) imported[key] = value
+                        } else {
+                            skipSubtree(parser)
+                        }
+                    }
+                }
+                imported
+            }
+        }.getOrElse { return }
+
+        if (values.isEmpty()) return
+        val editor = prefs.edit()
+        values.forEach { (key, value) -> editor.putString(key, value) }
+        editor.putBoolean("_legacyStatsImported", true).apply()
+    }
+
+    private fun skipSubtree(parser: XmlPullParser) {
+        var depth = 1
+        while (depth > 0) {
+            when (parser.next()) {
+                XmlPullParser.START_TAG -> depth++
+                XmlPullParser.END_TAG -> depth--
+            }
+        }
+    }
 
     fun get(trackId: Long): TrackStats {
         cache[trackId]?.let { return it }
