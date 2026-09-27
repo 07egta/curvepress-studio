@@ -160,17 +160,17 @@ private fun MuseWalkApp(vm: MainViewModel) {
         return
     }
 
-    if (showNowPlaying && ui.current != null) {
-        LaunchedEffect(ui.current?.id, ui.isPlaying, appInForeground) {
-            if (appInForeground) {
+    LaunchedEffect(ui.current?.id, ui.isPlaying, appInForeground, showNowPlaying, tab) {
+        if (appInForeground && ui.current != null && (showNowPlaying || tab == MainTab.Home)) {
+            vm.updateProgress()
+            while (ui.isPlaying && appInForeground) {
+                kotlinx.coroutines.delay(1_000)
                 vm.updateProgress()
-                while (ui.isPlaying && appInForeground) {
-                    kotlinx.coroutines.delay(1_000)
-                    vm.updateProgress()
-                }
             }
         }
+    }
 
+    if (showNowPlaying && ui.current != null) {
         BackHandler { showNowPlaying = false }
         NowPlayingScreen(
             track = ui.current!!,
@@ -243,7 +243,13 @@ private fun MuseWalkApp(vm: MainViewModel) {
             )
 
             else -> when (tab) {
-                MainTab.Home -> HomeScreen(ui, vm, Modifier.padding(padding))
+                MainTab.Home -> HomeScreen(
+                    ui = ui,
+                    vm = vm,
+                    onOpenNowPlaying = { showNowPlaying = true },
+                    onOpenQueue = { showQueue = true },
+                    modifier = Modifier.padding(padding)
+                )
                 MainTab.Library -> LibraryScreen(ui, vm, Modifier.padding(padding))
                 MainTab.Stats -> StatsScreen(ui, vm, Modifier.padding(padding))
             }
@@ -253,7 +259,13 @@ private fun MuseWalkApp(vm: MainViewModel) {
 }
 
 @Composable
-private fun HomeScreen(ui: HomeUiState, vm: MainViewModel, modifier: Modifier = Modifier) {
+private fun HomeScreen(
+    ui: HomeUiState,
+    vm: MainViewModel,
+    onOpenNowPlaying: () -> Unit,
+    onOpenQueue: () -> Unit,
+    modifier: Modifier = Modifier
+) {
     val compact = isCompactWalkman()
     val genres = remember(ui.tracks) { ui.genres }
     val favoriteTracks = remember(ui.tracks, ui.favorites) {
@@ -289,6 +301,30 @@ private fun HomeScreen(ui: HomeUiState, vm: MainViewModel, modifier: Modifier = 
             item {
                 LinearProgressIndicator(
                     modifier = Modifier.fillMaxWidth().height(2.dp)
+                )
+            }
+        }
+
+        ui.current?.let { current ->
+            item {
+                HomePlaybackCard(
+                    track = current,
+                    isPlaying = ui.isPlaying,
+                    positionMs = ui.playbackPositionMs,
+                    durationMs = ui.playbackDurationMs,
+                    queuedTrackCount = (ui.queue.size - ui.queueIndex - 1).coerceAtLeast(0),
+                    repeatMode = ui.repeatMode,
+                    shuffleEnabled = ui.shuffleEnabled,
+                    continuousPlayback = ui.continuousPlayback,
+                    onOpenNowPlaying = onOpenNowPlaying,
+                    onOpenQueue = onOpenQueue,
+                    onPrevious = vm::previous,
+                    onToggle = vm::togglePlayPause,
+                    onNext = vm::next,
+                    onSeek = vm::seekTo,
+                    onShuffle = vm::toggleShuffle,
+                    onRepeat = vm::cycleRepeatMode,
+                    onContinuous = vm::toggleContinuousPlayback
                 )
             }
         }
@@ -352,6 +388,199 @@ private fun HomeScreen(ui: HomeUiState, vm: MainViewModel, modifier: Modifier = 
         }
 
         item { Spacer(Modifier.height(24.dp)) }
+    }
+}
+
+@Composable
+private fun HomePlaybackCard(
+    track: Track,
+    isPlaying: Boolean,
+    positionMs: Long,
+    durationMs: Long,
+    queuedTrackCount: Int,
+    repeatMode: Int,
+    shuffleEnabled: Boolean,
+    continuousPlayback: Boolean,
+    onOpenNowPlaying: () -> Unit,
+    onOpenQueue: () -> Unit,
+    onPrevious: () -> Unit,
+    onToggle: () -> Unit,
+    onNext: () -> Unit,
+    onSeek: (Long) -> Unit,
+    onShuffle: () -> Unit,
+    onRepeat: () -> Unit,
+    onContinuous: () -> Unit
+) {
+    val compact = isCompactWalkman()
+    var dragging by remember(track.id) { mutableStateOf(false) }
+    var dragPosition by remember(track.id) { mutableFloatStateOf(positionMs.toFloat()) }
+
+    LaunchedEffect(positionMs, dragging) {
+        if (!dragging) dragPosition = positionMs.toFloat()
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(if (compact) 18.dp else 22.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(if (compact) 12.dp else 16.dp),
+            verticalArrangement = Arrangement.spacedBy(if (compact) 6.dp else 10.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("再生中", fontWeight = FontWeight.Bold)
+                    if (queuedTrackCount > 0) {
+                        Text(
+                            queuedTrackCount.toString() + "曲 待ち",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 11.sp
+                        )
+                    }
+                }
+                TextButton(onClick = onOpenQueue) {
+                    Icon(Icons.Default.QueueMusic, contentDescription = null, modifier = Modifier.size(19.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("曲順")
+                }
+            }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .clickable(onClick = onOpenNowPlaying)
+                    .padding(vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Artwork(track, Modifier.size(if (compact) 54.dp else 64.dp))
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        track.title,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        track.artist,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 12.sp
+                    )
+                    Text(
+                        track.genre,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 10.sp
+                    )
+                }
+                Icon(
+                    Icons.Default.OpenInFull,
+                    contentDescription = "再生画面を開く",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 6.dp).size(18.dp)
+                )
+            }
+
+            val safeDuration = durationMs.coerceAtLeast(1L)
+            Slider(
+                enabled = durationMs > 0L,
+                value = if (dragging) {
+                    dragPosition
+                } else {
+                    positionMs.coerceIn(0L, safeDuration).toFloat()
+                },
+                onValueChange = {
+                    dragging = true
+                    dragPosition = it
+                },
+                onValueChangeFinished = {
+                    if (durationMs > 0L) onSeek(dragPosition.toLong())
+                    dragging = false
+                },
+                valueRange = 0f..safeDuration.toFloat(),
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Row(Modifier.fillMaxWidth()) {
+                Text(
+                    formatDuration(if (dragging) dragPosition.toLong() else positionMs),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 11.sp
+                )
+                Spacer(Modifier.weight(1f))
+                Text(
+                    formatDuration(durationMs),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 11.sp
+                )
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                IconButton(onClick = onPrevious, modifier = Modifier.size(48.dp)) {
+                    Icon(Icons.Default.SkipPrevious, contentDescription = "前の曲")
+                }
+                IconButton(onClick = onToggle, modifier = Modifier.size(if (compact) 52.dp else 58.dp)) {
+                    Icon(
+                        if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        contentDescription = if (isPlaying) "一時停止" else "再生",
+                        modifier = Modifier.size(if (compact) 30.dp else 34.dp)
+                    )
+                }
+                IconButton(onClick = onNext, modifier = Modifier.size(48.dp)) {
+                    Icon(Icons.Default.SkipNext, contentDescription = "次の曲")
+                }
+                Spacer(Modifier.width(if (compact) 6.dp else 14.dp))
+                TextButton(
+                    onClick = onOpenQueue,
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+                ) {
+                    Icon(Icons.Default.QueueMusic, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(3.dp))
+                    Text("次の曲", fontSize = 11.sp)
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceAround,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                PlaybackModeButton(
+                    icon = Icons.Default.Shuffle,
+                    label = "シャッフル",
+                    active = shuffleEnabled,
+                    onClick = onShuffle
+                )
+                PlaybackModeButton(
+                    icon = if (repeatMode == Player.REPEAT_MODE_ONE) {
+                        Icons.Default.RepeatOne
+                    } else {
+                        Icons.Default.Repeat
+                    },
+                    label = when (repeatMode) {
+                        Player.REPEAT_MODE_ALL -> "全曲"
+                        Player.REPEAT_MODE_ONE -> "1曲"
+                        else -> "リピート"
+                    },
+                    active = repeatMode != Player.REPEAT_MODE_OFF,
+                    onClick = onRepeat
+                )
+                PlaybackModeButton(
+                    icon = Icons.Default.PlaylistPlay,
+                    label = "連続再生",
+                    active = continuousPlayback,
+                    onClick = onContinuous
+                )
+            }
+        }
     }
 }
 
