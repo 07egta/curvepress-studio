@@ -199,7 +199,7 @@ private fun MuseWalkApp(vm: MainViewModel) {
         containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
             Column {
-                if (ui.current != null) {
+                if (ui.current != null && tab != MainTab.Home) {
                     MiniPlayer(
                         track = ui.current,
                         isPlaying = ui.isPlaying,
@@ -248,6 +248,11 @@ private fun MuseWalkApp(vm: MainViewModel) {
                     vm = vm,
                     onOpenNowPlaying = { showNowPlaying = true },
                     onOpenQueue = { showQueue = true },
+                    onSelectGenre = { genre ->
+                        vm.search("")
+                        vm.selectGenre(genre)
+                        tab = MainTab.Library
+                    },
                     modifier = Modifier.padding(padding)
                 )
                 MainTab.Library -> LibraryScreen(ui, vm, Modifier.padding(padding))
@@ -264,10 +269,12 @@ private fun HomeScreen(
     vm: MainViewModel,
     onOpenNowPlaying: () -> Unit,
     onOpenQueue: () -> Unit,
+    onSelectGenre: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val compact = isCompactWalkman()
     val genres = remember(ui.tracks) { ui.genres }
+    val genreCounts = remember(ui.tracks) { ui.tracks.groupingBy { it.genre }.eachCount() }
     val favoriteTracks = remember(ui.tracks, ui.favorites) {
         ui.tracks.filter { it.id in ui.favorites }.take(12)
     }
@@ -286,14 +293,16 @@ private fun HomeScreen(
         ),
         verticalArrangement = Arrangement.spacedBy(if (compact) 16.dp else 24.dp)
     ) {
-        item {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("MuseWalk", style = MaterialTheme.typography.headlineLarge)
-                Text(
-                    "聴くほど、あなた向けに。",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = if (compact) 13.sp else 14.sp
-                )
+        if (ui.current == null || !compact) {
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("MuseWalk", style = MaterialTheme.typography.headlineLarge)
+                    Text(
+                        "聴くほど、あなた向けに。",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = if (compact) 13.sp else 14.sp
+                    )
+                }
             }
         }
 
@@ -329,6 +338,24 @@ private fun HomeScreen(
             }
         }
 
+        if (genres.isNotEmpty()) {
+            item {
+                SectionTitle("ジャンル別に聴く")
+                Spacer(Modifier.height(8.dp))
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(genres) { genre ->
+                        AssistChip(
+                            onClick = { onSelectGenre(genre) },
+                            label = {
+                                Text(genre + " · " + (genreCounts[genre] ?: 0))
+                            },
+                            leadingIcon = { Icon(Icons.Default.GraphicEq, null, Modifier.size(18.dp)) }
+                        )
+                    }
+                }
+            }
+        }
+
         item {
             HeroRecommendation(
                 item = ui.recommendations.firstOrNull(),
@@ -361,20 +388,6 @@ private fun HomeScreen(
                 SectionTitle("久しぶりに聴く？")
                 Spacer(Modifier.height(12.dp))
                 TrackCarousel(rediscovery) { vm.play(it.track, rediscovery.map { r -> r.track }) }
-            }
-        }
-
-        item {
-            SectionTitle("ジャンル")
-            Spacer(Modifier.height(12.dp))
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                items(genres) { genre ->
-                    AssistChip(
-                        onClick = { vm.selectGenre(genre) },
-                        label = { Text(genre) },
-                        leadingIcon = { Icon(Icons.Default.GraphicEq, null, Modifier.size(18.dp)) }
-                    )
-                }
             }
         }
 
@@ -521,42 +534,46 @@ private fun HomePlaybackCard(
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = onPrevious, modifier = Modifier.size(48.dp)) {
-                    Icon(Icons.Default.SkipPrevious, contentDescription = "前の曲")
+                IconButton(onClick = onPrevious, modifier = Modifier.size(56.dp)) {
+                    Icon(
+                        Icons.Default.SkipPrevious,
+                        contentDescription = "前の曲",
+                        modifier = Modifier.size(30.dp)
+                    )
                 }
-                IconButton(onClick = onToggle, modifier = Modifier.size(if (compact) 52.dp else 58.dp)) {
+                FilledIconButton(
+                    onClick = onToggle,
+                    modifier = Modifier.size(if (compact) 56.dp else 60.dp),
+                    shape = CircleShape
+                ) {
                     Icon(
                         if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                         contentDescription = if (isPlaying) "一時停止" else "再生",
                         modifier = Modifier.size(if (compact) 30.dp else 34.dp)
                     )
                 }
-                IconButton(onClick = onNext, modifier = Modifier.size(48.dp)) {
-                    Icon(Icons.Default.SkipNext, contentDescription = "次の曲")
-                }
-                Spacer(Modifier.width(if (compact) 6.dp else 14.dp))
-                TextButton(
-                    onClick = onOpenQueue,
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
-                ) {
-                    Icon(Icons.Default.QueueMusic, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(3.dp))
-                    Text("次の曲", fontSize = 11.sp)
+                IconButton(onClick = onNext, modifier = Modifier.size(56.dp)) {
+                    Icon(
+                        Icons.Default.SkipNext,
+                        contentDescription = "次の曲",
+                        modifier = Modifier.size(30.dp)
+                    )
                 }
             }
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceAround,
+                horizontalArrangement = Arrangement.spacedBy(if (compact) 4.dp else 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 PlaybackModeButton(
                     icon = Icons.Default.Shuffle,
                     label = "シャッフル",
                     active = shuffleEnabled,
+                    modifier = Modifier.weight(1f),
                     onClick = onShuffle
                 )
                 PlaybackModeButton(
@@ -571,12 +588,14 @@ private fun HomePlaybackCard(
                         else -> "リピート"
                     },
                     active = repeatMode != Player.REPEAT_MODE_OFF,
+                    modifier = Modifier.weight(1f),
                     onClick = onRepeat
                 )
                 PlaybackModeButton(
                     icon = Icons.Default.PlaylistPlay,
                     label = "連続再生",
                     active = continuousPlayback,
+                    modifier = Modifier.weight(1f),
                     onClick = onContinuous
                 )
             }
@@ -773,6 +792,7 @@ private fun TrackCarousel(items: List<RecommendedTrack>, onClick: (RecommendedTr
 private fun LibraryScreen(ui: HomeUiState, vm: MainViewModel, modifier: Modifier = Modifier) {
     val compact = isCompactWalkman()
     val genres = remember(ui.tracks) { ui.genres }
+    val genreCounts = remember(ui.tracks) { ui.tracks.groupingBy { it.genre }.eachCount() }
     val visibleTracks = remember(ui.tracks, ui.selectedGenre, ui.searchQuery) { ui.visibleTracks }
 
     LazyColumn(
@@ -812,15 +832,31 @@ private fun LibraryScreen(ui: HomeUiState, vm: MainViewModel, modifier: Modifier
                         FilterChip(
                             selected = ui.selectedGenre == genre,
                             onClick = { vm.selectGenre(genre) },
-                            label = { Text(genre) }
+                            label = { Text(genre + " · " + (genreCounts[genre] ?: 0)) }
                         )
                     }
                 }
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    (ui.selectedGenre ?: "すべて") + " ・ " + visibleTracks.size + "曲",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = if (compact) 12.sp else 13.sp
+                )
             }
         }
 
         item {
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
+        }
+
+        if (visibleTracks.isEmpty()) {
+            item {
+                Text(
+                    "この条件に合う曲がありません。",
+                    modifier = Modifier.padding(horizontal = if (compact) 14.dp else 20.dp, vertical = 24.dp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
 
         items(visibleTracks, key = { it.id }) { track ->
@@ -945,7 +981,13 @@ private fun Artwork(track: Track, modifier: Modifier = Modifier) {
             "アニメ・ゲーム" -> Color(0xFF66519C)
             "洋楽" -> Color(0xFF3D5FA8)
             "J-POP" -> Color(0xFFB54E70)
+            "ポップ" -> Color(0xFFB54E70)
+            "ロック" -> Color(0xFFB14D4D)
+            "ジャズ" -> Color(0xFF397B86)
+            "ヒップホップ", "R&B・ソウル" -> Color(0xFF6A558D)
+            "クラシック" -> Color(0xFF97764B)
             "BGM" -> Color(0xFF4D5DA7)
+            "ジャンル未設定" -> Color(0xFF686D78)
             else -> Color(0xFF4D5361)
         }
     }
@@ -1213,25 +1255,28 @@ private fun NowPlayingScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(if (compact) 52.dp else 60.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly,
+                horizontalArrangement = Arrangement.spacedBy(if (compact) 2.dp else 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 PlaybackModeButton(
                     icon = Icons.Default.Shuffle,
                     label = "シャッフル",
                     active = shuffleEnabled,
+                    modifier = Modifier.weight(1f),
                     onClick = onShuffle
                 )
                 PlaybackModeButton(
                     icon = repeatIcon,
                     label = repeatLabel,
                     active = repeatMode != Player.REPEAT_MODE_OFF,
+                    modifier = Modifier.weight(1f),
                     onClick = onRepeat
                 )
                 PlaybackModeButton(
                     icon = Icons.Default.PlaylistPlay,
                     label = "連続",
                     active = continuousPlayback,
+                    modifier = Modifier.weight(1f),
                     onClick = onContinuous
                 )
             }
@@ -1253,21 +1298,28 @@ private fun PlaybackModeButton(
     icon: ImageVector,
     label: String,
     active: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val color = if (active) {
         MaterialTheme.colorScheme.primary
     } else {
         MaterialTheme.colorScheme.onSurfaceVariant
     }
+    val shape = RoundedCornerShape(14.dp)
 
     Column(
-        modifier = Modifier
-            .width(88.dp)
-            .clip(RoundedCornerShape(14.dp))
+        modifier = modifier
+            .heightIn(min = 52.dp)
+            .clip(shape)
+            .background(
+                if (active) MaterialTheme.colorScheme.primary.copy(alpha = 0.10f) else Color.Transparent,
+                shape
+            )
             .clickable(onClick = onClick)
-            .padding(vertical = 4.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+            .padding(horizontal = 2.dp, vertical = 5.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
     ) {
         Icon(
             icon,
@@ -1278,7 +1330,7 @@ private fun PlaybackModeButton(
         Text(
             label,
             color = color,
-            fontSize = 9.5.sp,
+            fontSize = 10.sp,
             maxLines = 1
         )
     }
@@ -1339,13 +1391,14 @@ private fun QueueScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 8.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             PlaybackModeButton(
                 icon = Icons.Default.Shuffle,
                 label = "シャッフル",
                 active = shuffleEnabled,
+                modifier = Modifier.weight(1f),
                 onClick = onShuffle
             )
             PlaybackModeButton(
@@ -1360,12 +1413,14 @@ private fun QueueScreen(
                     else -> "リピート"
                 },
                 active = repeatMode != Player.REPEAT_MODE_OFF,
+                modifier = Modifier.weight(1f),
                 onClick = onRepeat
             )
             PlaybackModeButton(
                 icon = Icons.Default.PlaylistPlay,
                 label = "連続",
                 active = continuousPlayback,
+                modifier = Modifier.weight(1f),
                 onClick = onContinuous
             )
         }
