@@ -774,63 +774,66 @@ private fun LibraryScreen(ui: HomeUiState, vm: MainViewModel, modifier: Modifier
     val compact = isCompactWalkman()
     val genres = remember(ui.tracks) { ui.genres }
     val visibleTracks = remember(ui.tracks, ui.selectedGenre, ui.searchQuery) { ui.visibleTracks }
-    Column(modifier.fillMaxSize()) {
-        Column(
-            Modifier.padding(
-                horizontal = if (compact) 14.dp else 20.dp,
-                vertical = if (compact) 10.dp else 16.dp
-            )
-        ) {
-            Text("ライブラリ", style = MaterialTheme.typography.headlineLarge)
-            Spacer(Modifier.height(if (compact) 8.dp else 14.dp))
-            OutlinedTextField(
-                value = ui.searchQuery,
-                onValueChange = vm::search,
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                shape = RoundedCornerShape(18.dp),
-                placeholder = { Text("曲、アーティスト、アルバムを検索") },
-                leadingIcon = { Icon(Icons.Default.Search, null) }
-            )
-            Spacer(Modifier.height(if (compact) 8.dp else 12.dp))
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(if (compact) 6.dp else 8.dp)) {
-                item {
-                    FilterChip(
-                        selected = ui.selectedGenre == null,
-                        onClick = { vm.selectGenre(null) },
-                        label = { Text("すべて") }
-                    )
-                }
-                items(genres) { genre ->
-                    FilterChip(
-                        selected = ui.selectedGenre == genre,
-                        onClick = { vm.selectGenre(genre) },
-                        label = { Text(genre) }
-                    )
-                }
-            }
-        }
 
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
-
-        LazyColumn(
-            contentPadding = PaddingValues(
-                horizontal = if (compact) 10.dp else 16.dp,
-                vertical = if (compact) 5.dp else 8.dp
-            )
-        ) {
-            items(visibleTracks, key = { it.id }) { track ->
-                TrackRow(
-                    track = track,
-                    subtitle = track.artist + "  ·  " + track.genre,
-                    onClick = { vm.play(track, visibleTracks) }
+    LazyColumn(
+        modifier = modifier.fillMaxSize(),
+        contentPadding = PaddingValues(bottom = 16.dp)
+    ) {
+        item {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(
+                        horizontal = if (compact) 14.dp else 20.dp,
+                        vertical = if (compact) 10.dp else 16.dp
+                    )
+            ) {
+                Text("ライブラリ", style = MaterialTheme.typography.headlineLarge)
+                Spacer(Modifier.height(if (compact) 8.dp else 14.dp))
+                OutlinedTextField(
+                    value = ui.searchQuery,
+                    onValueChange = vm::search,
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    shape = RoundedCornerShape(18.dp),
+                    placeholder = { Text("曲、アーティスト、アルバムを検索") },
+                    leadingIcon = { Icon(Icons.Default.Search, null) }
                 )
+                Spacer(Modifier.height(if (compact) 8.dp else 12.dp))
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(if (compact) 6.dp else 8.dp)) {
+                    item {
+                        FilterChip(
+                            selected = ui.selectedGenre == null,
+                            onClick = { vm.selectGenre(null) },
+                            label = { Text("すべて") }
+                        )
+                    }
+                    items(genres) { genre ->
+                        FilterChip(
+                            selected = ui.selectedGenre == genre,
+                            onClick = { vm.selectGenre(genre) },
+                            label = { Text(genre) }
+                        )
+                    }
+                }
             }
-            item { Spacer(Modifier.height(24.dp)) }
         }
+
+        item {
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
+        }
+
+        items(visibleTracks, key = { it.id }) { track ->
+            TrackRow(
+                track = track,
+                subtitle = track.artist + "  ·  " + track.genre,
+                onClick = { vm.play(track, visibleTracks) }
+            )
+        }
+
+        item { Spacer(Modifier.height(24.dp)) }
     }
 }
-
 @Composable
 private fun StatsScreen(ui: HomeUiState, vm: MainViewModel, modifier: Modifier = Modifier) {
     val compact = isCompactWalkman()
