@@ -1,16 +1,20 @@
 package com.egtgpt.musewalk
 
 import android.app.Application
+import androidx.annotation.OptIn
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.Player
+import androidx.media3.common.Timeline
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.ExoPlayer
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.Dispatchers
 import java.util.Calendar
 
 data class HomeUiState(
@@ -26,6 +30,9 @@ data class HomeUiState(
     val queueIndex: Int = -1,
     val playbackPositionMs: Long = 0L,
     val playbackDurationMs: Long = 0L,
+    val repeatMode: Int = Player.REPEAT_MODE_OFF,
+    val shuffleEnabled: Boolean = false,
+    val continuousPlayback: Boolean = true,
     val error: String? = null
 ) {
     val genres: List<String>
@@ -45,15 +52,22 @@ data class HomeUiState(
         }
 }
 
+@OptIn(UnstableApi::class)
 class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val library = MusicLibrary(app)
     private val stats = StatsStore(app)
     private val favoritesStore = FavoritesStore(app)
     private val replayGain = ReplayGainStore(app)
+    private val playbackPrefs = PlaybackPrefsStore(app)
     private val engine = RecommendationEngine(stats)
 
     private val _ui = MutableStateFlow(
-        HomeUiState(favorites = favoritesStore.all())
+        HomeUiState(
+            favorites = favoritesStore.all(),
+            repeatMode = playbackPrefs.repeatMode,
+            shuffleEnabled = playbackPrefs.shuffleEnabled,
+            continuousPlayback = playbackPrefs.continuousPlayback
+        )
     )
     val ui: StateFlow<HomeUiState> = _ui.asStateFlow()
 
@@ -99,15 +113,34 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             }
             updatePlaybackState(includeQueue = false)
         }
+
+        override fun onTimelineChanged(timeline: Timeline, reason: Int) {
+            updatePlaybackState(includeQueue = true)
+        }
+
+        override fun onRepeatModeChanged(repeatMode: Int) {
+            _ui.value = _ui.value.copy(repeatMode = repeatMode)
+        }
+
+        override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {
+            _ui.value = _ui.value.copy(shuffleEnabled = shuffleModeEnabled)
+        }
     }
 
-    private fun ensurePlayer(): Player {
+    private fun ensurePlayer(): ExoPlayer {
         val player = PlayerManager.get(getApplication())
         if (!listenerAttached) {
             player.addListener(listener)
             listenerAttached = true
         }
+        applyPlaybackPrefs(player)
         return player
+    }
+
+    private fun applyPlaybackPrefs(player: ExoPlayer) {
+        player.repeatMode = playbackPrefs.repeatMode
+        player.shuffleModeEnabled = playbackPrefs.shuffleEnabled
+        player.setPauseAtEndOfMediaItems(!playbackPrefs.continuousPlayback)
     }
 
     fun loadLibrary() {
@@ -118,7 +151,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             result.onSuccess { tracks ->
                 trackById = tracks.associateBy { it.id }
 
-                // First paint immediately. Heavy recommendation scoring comes later.
                 val instant = tracks.take(20).map {
                     RecommendedTrack(it, 0.0, "最近追加した曲")
                 }
@@ -128,6 +160,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     tracks = tracks,
                     recommendations = instant,
                     favorites = favoritesStore.all(),
+                    repeatMode = playbackPrefs.repeatMode,
+                    shuffleEnabled = playbackPrefs.shuffleEnabled,
+                    continuousPlayback = playbackPrefs.continuousPlayback,
                     error = null
                 )
 
@@ -136,6 +171,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                         it.addListener(listener)
                         listenerAttached = true
                     }
+                    applyPlaybackPrefs(it)
                     updatePlaybackState(includeQueue = true)
                 }
 
@@ -153,7 +189,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         val list = if (source.any { it.id == track.id }) source else _ui.value.tracks
         val originalIndex = list.indexOfFirst { it.id == track.id }.coerceAtLeast(0)
 
-        // Keep the media queue bounded on the low-power A300.
+        // A300: cap the prepared queue to reduce allocation and MediaItem overhead.
         val before = 12
         val maxQueue = 60
         val start = (originalIndex - before).coerceAtLeast(0)
@@ -162,7 +198,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         val queueIndex = originalIndex - start
 
         viewModelScope.launch {
-            // Only inspect this track's metadata on demand; never full-scan audio in background.
             val initialVolume = replayGain.volumeFor(track)
             ensurePlayer()
             PlayerManager.play(
@@ -171,6 +206,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 startIndex = queueIndex,
                 initialVolume = initialVolume
             )
+            updatePlaybackState(includeQueue = true)
         }
     }
 
@@ -217,15 +253,17 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun next() {
         val player = PlayerManager.peek() ?: return
-        // The media-item transition listener records the skip exactly once.
         player.seekToNextMediaItem()
         player.play()
-        // Do not recalculate recommendations here: this may happen with screen off.
     }
 
     fun previous() {
         val player = PlayerManager.peek() ?: return
-        player.seekToPreviousMediaItem()
+        if (player.currentPosition > 5_000L) {
+            player.seekTo(0L)
+        } else {
+            player.seekToPreviousMediaItem()
+        }
         player.play()
     }
 
@@ -234,6 +272,55 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         if (index !in 0 until player.mediaItemCount) return
         player.seekTo(index, 0L)
         player.play()
+    }
+
+    /**
+     * Move a queue item directly after the currently playing track.
+     * Manual queue editing disables shuffle so "next" stays deterministic.
+     */
+    fun playNextQueueItem(index: Int) {
+        val player = PlayerManager.peek() ?: return
+        if (index !in 0 until player.mediaItemCount) return
+        val current = player.currentMediaItemIndex
+        if (index == current) return
+
+        disableShuffleForQueueEdit(player)
+
+        val item = player.getMediaItemAt(index)
+        player.removeMediaItem(index)
+        val updatedCurrent = player.currentMediaItemIndex
+        val insertAt = (updatedCurrent + 1).coerceIn(0, player.mediaItemCount)
+        player.addMediaItem(insertAt, item)
+        updatePlaybackState(includeQueue = true)
+    }
+
+    fun moveQueueItem(from: Int, to: Int) {
+        val player = PlayerManager.peek() ?: return
+        if (from !in 0 until player.mediaItemCount) return
+        if (to !in 0 until player.mediaItemCount) return
+        if (from == to) return
+
+        disableShuffleForQueueEdit(player)
+        player.moveMediaItem(from, to)
+        updatePlaybackState(includeQueue = true)
+    }
+
+    fun removeQueueItem(index: Int) {
+        val player = PlayerManager.peek() ?: return
+        if (index !in 0 until player.mediaItemCount) return
+        // Keep the currently playing item stable. Users can skip it instead.
+        if (index == player.currentMediaItemIndex) return
+
+        disableShuffleForQueueEdit(player)
+        player.removeMediaItem(index)
+        updatePlaybackState(includeQueue = true)
+    }
+
+    private fun disableShuffleForQueueEdit(player: ExoPlayer) {
+        if (!player.shuffleModeEnabled) return
+        player.shuffleModeEnabled = false
+        playbackPrefs.shuffleEnabled = false
+        _ui.value = _ui.value.copy(shuffleEnabled = false)
     }
 
     fun seekTo(positionMs: Long) {
@@ -245,7 +332,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     /**
      * Called only while the full-screen player is visible.
-     * No permanent ticker is kept in the ViewModel.
+     * 1 Hz is deliberate: smooth enough for a music seekbar, much cheaper on A300.
      */
     fun updateProgress() {
         val player = PlayerManager.peek() ?: return
@@ -256,6 +343,53 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             playbackPositionMs = player.currentPosition.coerceAtLeast(0L),
             playbackDurationMs = duration.coerceAtLeast(0L)
         )
+    }
+
+    fun toggleShuffle() {
+        val player = ensurePlayer()
+        val enabled = !player.shuffleModeEnabled
+        player.shuffleModeEnabled = enabled
+        playbackPrefs.shuffleEnabled = enabled
+        _ui.value = _ui.value.copy(shuffleEnabled = enabled)
+    }
+
+    fun cycleRepeatMode() {
+        val player = ensurePlayer()
+        val next = when (player.repeatMode) {
+            Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL
+            Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE
+            else -> Player.REPEAT_MODE_OFF
+        }
+
+        if (next != Player.REPEAT_MODE_OFF && !_ui.value.continuousPlayback) {
+            setContinuousPlaybackInternal(player, true)
+        }
+
+        player.repeatMode = next
+        playbackPrefs.repeatMode = next
+        _ui.value = _ui.value.copy(repeatMode = next)
+    }
+
+    fun toggleContinuousPlayback() {
+        val player = ensurePlayer()
+        val enabled = !_ui.value.continuousPlayback
+
+        // A paused-at-end player cannot meaningfully repeat automatically.
+        if (!enabled && player.repeatMode != Player.REPEAT_MODE_OFF) {
+            player.repeatMode = Player.REPEAT_MODE_OFF
+            playbackPrefs.repeatMode = Player.REPEAT_MODE_OFF
+        }
+
+        setContinuousPlaybackInternal(player, enabled)
+        _ui.value = _ui.value.copy(
+            continuousPlayback = enabled,
+            repeatMode = player.repeatMode
+        )
+    }
+
+    private fun setContinuousPlaybackInternal(player: ExoPlayer, enabled: Boolean) {
+        player.setPauseAtEndOfMediaItems(!enabled)
+        playbackPrefs.continuousPlayback = enabled
     }
 
     fun toggleFavorite(track: Track) {
@@ -310,7 +444,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         } else if (!skipped && !countedAsFinished) {
             stats.markFinished(id, listened)
         }
-        // Battery policy: recommendations update on launch/favorite changes, not every song.
     }
 
     private fun updatePlaybackState(includeQueue: Boolean) {
@@ -336,7 +469,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             queue = queue,
             queueIndex = player.currentMediaItemIndex,
             playbackPositionMs = player.currentPosition.coerceAtLeast(0L),
-            playbackDurationMs = duration.coerceAtLeast(0L)
+            playbackDurationMs = duration.coerceAtLeast(0L),
+            repeatMode = player.repeatMode,
+            shuffleEnabled = player.shuffleModeEnabled,
+            continuousPlayback = playbackPrefs.continuousPlayback
         )
     }
 
