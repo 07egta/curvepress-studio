@@ -775,13 +775,19 @@ private fun NowPlayingScreen(
     positionMs: Long,
     durationMs: Long,
     isFavorite: Boolean,
+    repeatMode: Int,
+    shuffleEnabled: Boolean,
+    continuousPlayback: Boolean,
     onBack: () -> Unit,
     onPrevious: () -> Unit,
     onToggle: () -> Unit,
     onNext: () -> Unit,
     onFavorite: () -> Unit,
     onSeek: (Long) -> Unit,
-    onQueue: () -> Unit
+    onQueue: () -> Unit,
+    onShuffle: () -> Unit,
+    onRepeat: () -> Unit,
+    onContinuous: () -> Unit
 ) {
     val compact = isCompactWalkman()
     var dragging by remember(track.id) { mutableStateOf(false) }
@@ -799,9 +805,9 @@ private fun NowPlayingScreen(
             .navigationBarsPadding()
     ) {
         val artworkSize = if (compact) {
-            minOf(maxWidth * 0.52f, maxHeight * 0.24f)
+            minOf(maxWidth * 0.50f, maxHeight * 0.22f)
         } else {
-            minOf(maxWidth * 0.70f, maxHeight * 0.36f)
+            minOf(maxWidth * 0.70f, maxHeight * 0.34f)
         }
 
         Column(
@@ -846,10 +852,10 @@ private fun NowPlayingScreen(
                 track,
                 Modifier
                     .size(artworkSize)
-                    .clip(RoundedCornerShape(if (compact) 22.dp else 30.dp))
+                    .clip(RoundedCornerShape(if (compact) 20.dp else 30.dp))
             )
 
-            Spacer(Modifier.height(if (compact) 10.dp else 24.dp))
+            Spacer(Modifier.height(if (compact) 9.dp else 24.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -882,11 +888,15 @@ private fun NowPlayingScreen(
                 }
             }
 
-            Spacer(Modifier.height(if (compact) 4.dp else 10.dp))
+            Spacer(Modifier.height(if (compact) 2.dp else 10.dp))
 
             val safeDuration = durationMs.coerceAtLeast(1L)
             Slider(
-                value = if (dragging) dragPosition else positionMs.coerceIn(0L, safeDuration).toFloat(),
+                value = if (dragging) {
+                    dragPosition
+                } else {
+                    positionMs.coerceIn(0L, safeDuration).toFloat()
+                },
                 onValueChange = {
                     dragging = true
                     dragPosition = it
@@ -898,12 +908,14 @@ private fun NowPlayingScreen(
                 valueRange = 0f..safeDuration.toFloat(),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(if (compact) 34.dp else 42.dp)
+                    .height(if (compact) 32.dp else 42.dp)
             )
 
             Row(Modifier.fillMaxWidth()) {
                 Text(
-                    formatDuration((if (dragging) dragPosition.toLong() else positionMs).coerceAtLeast(0L)),
+                    formatDuration(
+                        (if (dragging) dragPosition.toLong() else positionMs).coerceAtLeast(0L)
+                    ),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 10.sp
                 )
@@ -920,7 +932,7 @@ private fun NowPlayingScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(if (compact) 70.dp else 92.dp),
+                    .height(if (compact) 66.dp else 88.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -953,15 +965,89 @@ private fun NowPlayingScreen(
                 }
             }
 
+            val repeatLabel = when (repeatMode) {
+                Player.REPEAT_MODE_ALL -> "全曲"
+                Player.REPEAT_MODE_ONE -> "1曲"
+                else -> "リピート"
+            }
+            val repeatIcon = if (repeatMode == Player.REPEAT_MODE_ONE) {
+                Icons.Default.RepeatOne
+            } else {
+                Icons.Default.Repeat
+            }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(if (compact) 52.dp else 60.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                PlaybackModeButton(
+                    icon = Icons.Default.Shuffle,
+                    label = "シャッフル",
+                    active = shuffleEnabled,
+                    onClick = onShuffle
+                )
+                PlaybackModeButton(
+                    icon = repeatIcon,
+                    label = repeatLabel,
+                    active = repeatMode != Player.REPEAT_MODE_OFF,
+                    onClick = onRepeat
+                )
+                PlaybackModeButton(
+                    icon = Icons.Default.PlaylistPlay,
+                    label = "連続",
+                    active = continuousPlayback,
+                    onClick = onContinuous
+                )
+            }
+
             Text(
                 text = track.genre,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontSize = if (compact) 10.5.sp else 12.sp,
+                fontSize = if (compact) 10.sp else 12.sp,
                 maxLines = 1
             )
 
-            Spacer(Modifier.height(if (compact) 7.dp else 16.dp))
+            Spacer(Modifier.height(if (compact) 5.dp else 14.dp))
         }
+    }
+}
+
+@Composable
+private fun PlaybackModeButton(
+    icon: ImageVector,
+    label: String,
+    active: Boolean,
+    onClick: () -> Unit
+) {
+    val color = if (active) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
+
+    Column(
+        modifier = Modifier
+            .width(88.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .clickable(onClick = onClick)
+            .padding(vertical = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Icon(
+            icon,
+            contentDescription = label,
+            tint = color,
+            modifier = Modifier.size(21.dp)
+        )
+        Text(
+            label,
+            color = color,
+            fontSize = 9.5.sp,
+            maxLines = 1
+        )
     }
 }
 
@@ -969,10 +1055,20 @@ private fun NowPlayingScreen(
 private fun QueueScreen(
     queue: List<Track>,
     currentIndex: Int,
+    repeatMode: Int,
+    shuffleEnabled: Boolean,
+    continuousPlayback: Boolean,
     onBack: () -> Unit,
-    onSelect: (Int) -> Unit
+    onSelect: (Int) -> Unit,
+    onPlayNext: (Int) -> Unit,
+    onMove: (Int, Int) -> Unit,
+    onRemove: (Int) -> Unit,
+    onShuffle: () -> Unit,
+    onRepeat: () -> Unit,
+    onContinuous: () -> Unit
 ) {
     val compact = isCompactWalkman()
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -1001,10 +1097,54 @@ private fun QueueScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 11.sp
             )
-            Spacer(Modifier.width(10.dp))
+            Spacer(Modifier.width(8.dp))
         }
 
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            PlaybackModeButton(
+                icon = Icons.Default.Shuffle,
+                label = "シャッフル",
+                active = shuffleEnabled,
+                onClick = onShuffle
+            )
+            PlaybackModeButton(
+                icon = if (repeatMode == Player.REPEAT_MODE_ONE) {
+                    Icons.Default.RepeatOne
+                } else {
+                    Icons.Default.Repeat
+                },
+                label = when (repeatMode) {
+                    Player.REPEAT_MODE_ALL -> "全曲"
+                    Player.REPEAT_MODE_ONE -> "1曲"
+                    else -> "リピート"
+                },
+                active = repeatMode != Player.REPEAT_MODE_OFF,
+                onClick = onRepeat
+            )
+            PlaybackModeButton(
+                icon = Icons.Default.PlaylistPlay,
+                label = "連続",
+                active = continuousPlayback,
+                onClick = onContinuous
+            )
+        }
+
+        if (shuffleEnabled) {
+            Text(
+                "手動で順番を変えるとシャッフルはOFFになります",
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 2.dp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 9.5.sp
+            )
+        }
 
         if (queue.isEmpty()) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -1014,11 +1154,14 @@ private fun QueueScreen(
             LazyColumn(
                 contentPadding = PaddingValues(
                     horizontal = if (compact) 8.dp else 14.dp,
-                    vertical = 6.dp
+                    vertical = 4.dp
                 )
             ) {
                 itemsIndexed(queue, key = { _, track -> track.id }) { index, track ->
                     val active = index == currentIndex
+                    val next = !shuffleEnabled && index == currentIndex + 1
+                    var menuOpen by remember(track.id, index) { mutableStateOf(false) }
+
                     Surface(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -1031,29 +1174,36 @@ private fun QueueScreen(
                         }
                     ) {
                         Row(
-                            Modifier.padding(horizontal = 6.dp, vertical = 5.dp),
+                            Modifier.padding(horizontal = 5.dp, vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Box(
-                                Modifier.width(22.dp),
+                                Modifier.width(30.dp),
                                 contentAlignment = Alignment.Center
                             ) {
-                                if (active) {
-                                    Icon(
+                                when {
+                                    active -> Icon(
                                         Icons.Default.GraphicEq,
                                         contentDescription = null,
                                         modifier = Modifier.size(17.dp)
                                     )
-                                } else {
-                                    Text(
+                                    next -> Text(
+                                        "NEXT",
+                                        color = MaterialTheme.colorScheme.primary,
+                                        fontSize = 7.5.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    else -> Text(
                                         (index + 1).toString(),
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         fontSize = 10.sp
                                     )
                                 }
                             }
-                            Artwork(track, Modifier.size(if (compact) 43.dp else 50.dp))
-                            Spacer(Modifier.width(9.dp))
+
+                            Artwork(track, Modifier.size(if (compact) 42.dp else 50.dp))
+                            Spacer(Modifier.width(8.dp))
+
                             Column(Modifier.weight(1f)) {
                                 Text(
                                     track.title,
@@ -1066,14 +1216,72 @@ private fun QueueScreen(
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    fontSize = 11.sp
+                                    fontSize = 10.5.sp
                                 )
                             }
-                            Text(
-                                formatDuration(track.durationMs),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                fontSize = 10.sp
-                            )
+
+                            Box {
+                                IconButton(
+                                    onClick = { menuOpen = true },
+                                    modifier = Modifier.size(44.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.MoreVert,
+                                        contentDescription = "キュー操作",
+                                        modifier = Modifier.size(21.dp)
+                                    )
+                                }
+
+                                DropdownMenu(
+                                    expanded = menuOpen,
+                                    onDismissRequest = { menuOpen = false }
+                                ) {
+                                    DropdownMenuItem(
+                                        text = { Text("次に再生") },
+                                        leadingIcon = {
+                                            Icon(Icons.Default.SkipNext, contentDescription = null)
+                                        },
+                                        enabled = !active,
+                                        onClick = {
+                                            menuOpen = false
+                                            onPlayNext(index)
+                                        }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("1つ上へ") },
+                                        leadingIcon = {
+                                            Icon(Icons.Default.KeyboardArrowUp, contentDescription = null)
+                                        },
+                                        enabled = index > 0,
+                                        onClick = {
+                                            menuOpen = false
+                                            onMove(index, index - 1)
+                                        }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("1つ下へ") },
+                                        leadingIcon = {
+                                            Icon(Icons.Default.KeyboardArrowDown, contentDescription = null)
+                                        },
+                                        enabled = index < queue.lastIndex,
+                                        onClick = {
+                                            menuOpen = false
+                                            onMove(index, index + 1)
+                                        }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("キューから削除") },
+                                        leadingIcon = {
+                                            Icon(Icons.Default.DeleteOutline, contentDescription = null)
+                                        },
+                                        enabled = !active,
+                                        onClick = {
+                                            menuOpen = false
+                                            onRemove(index)
+                                        }
+                                    )
+                                }
+                            }
                         }
                     }
                 }
