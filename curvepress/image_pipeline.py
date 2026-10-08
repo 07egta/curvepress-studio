@@ -67,7 +67,8 @@ def fit_on_plate(image: Image.Image, config: PlateConfig) -> tuple[Image.Image, 
     margin = int(round(config.edge_margin_mm * config.analysis_ppm))
     max_w = max(8, nx - 2 * margin)
     max_h = max(8, ny - 2 * margin)
-    source = _paper_crop(image)
+    # Honor the scan-frame toggle before cropping any source image pixels.
+    source = _paper_crop(image) if config.remove_scan_frame else image
     scale = min(max_w / source.width, max_h / source.height)
     fitted = source.resize(
         (max(1, int(round(source.width * scale))), max(1, int(round(source.height * scale)))),
@@ -172,7 +173,6 @@ def _halftone_mask(corrected: Image.Image, config: PlateConfig) -> np.ndarray:
     cx, cy = width * 0.5, height * 0.5
     diagonal = int(math.ceil(math.hypot(width, height)))
     mask = np.zeros((height, width), dtype=bool)
-    yy, xx = np.ogrid[:height, :width]
 
     for gy in range(-diagonal, diagonal + pitch, pitch):
         for gx in range(-diagonal, diagonal + pitch, pitch):
@@ -185,8 +185,16 @@ def _halftone_mask(corrected: Image.Image, config: PlateConfig) -> np.ndarray:
             if tone < 0.055:
                 continue
             radius = min_radius + (max_radius - min_radius) * tone**0.72
-            disk = (xx - x) ** 2 + (yy - y) ** 2 <= radius**2
-            mask |= disk
+            # Restrict each dot to its local bounds instead of rasterizing the full plate.
+            # Keep the same floating-point center, radius and pixel inclusion rule.
+            x0 = max(0, math.floor(x - radius))
+            x1 = min(width, math.ceil(x + radius) + 1)
+            y0 = max(0, math.floor(y - radius))
+            y1 = min(height, math.ceil(y + radius) + 1)
+            if x0 >= x1 or y0 >= y1:
+                continue
+            yy, xx = np.ogrid[y0:y1, x0:x1]
+            mask[y0:y1, x0:x1] |= (xx - x) ** 2 + (yy - y) ** 2 <= radius**2
     return mask
 
 
