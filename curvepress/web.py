@@ -42,6 +42,7 @@ def _analysis_payload(result: AnalysisResult) -> dict:
             "corrected": _artifact_url(result.job_id, "corrected.png"),
             "print": _artifact_url(result.job_id, "print-preview.png"),
             "curves": _artifact_url(result.job_id, "curve-preview.png"),
+            "proof": _artifact_url(result.job_id, "proof-preview.png"),
         },
         "layers": [
             {
@@ -49,6 +50,7 @@ def _analysis_payload(result: AnalysisResult) -> dict:
                 "color": layer.color_hex,
                 "mask": _artifact_url(result.job_id, f"{layer.name}-mask.png"),
                 "svg": _artifact_url(result.job_id, f"{layer.name}.svg"),
+                "height": _artifact_url(result.job_id, f"{layer.name}-height.png"),
             }
             for layer in result.layers
         ],
@@ -100,7 +102,7 @@ def _run_export(job_id: str, config: PlateConfig) -> None:
 
 
 class CurvePressHandler(BaseHTTPRequestHandler):
-    server_version = "CurvePress/0.1.1"
+    server_version = "CurvePress/0.2.0"
 
     def log_message(self, fmt: str, *args) -> None:
         print(f"[CurvePress] {self.address_string()} {fmt % args}")
@@ -126,7 +128,7 @@ class CurvePressHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:  # noqa: N802
         path = unquote(urlparse(self.path).path)
         if path == "/api/health":
-            self._json(200, {"ok": True, "version": "0.1.1"})
+            self._json(200, {"ok": True, "version": "0.2.0"})
             return
         if path.startswith("/api/export/"):
             job_id = path.rsplit("/", 1)[-1]

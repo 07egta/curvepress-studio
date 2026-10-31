@@ -8,7 +8,7 @@ from PIL import Image, ImageOps
 from scipy import ndimage
 
 from .config import PlateConfig
-from .physical import apply_printability
+from .physical import apply_printability, registration_mask
 
 
 PALETTE = ["#101820", "#174a7e", "#43a6c6", "#e56b4a", "#e3b341", "#6d597a"]
@@ -65,8 +65,15 @@ def fit_on_plate(image: Image.Image, config: PlateConfig) -> tuple[Image.Image, 
     nx = int(round(config.width_mm * config.analysis_ppm))
     ny = int(round(config.height_mm * config.analysis_ppm))
     margin = int(round(config.edge_margin_mm * config.analysis_ppm))
+    # Multi-colour plates reserve a band along the bottom edge for kento marks
+    # so the registration stops never touch the artwork.
+    band = (
+        int(round(config.registration_band_mm * config.analysis_ppm))
+        if config.uses_registration()
+        else 0
+    )
     max_w = max(8, nx - 2 * margin)
-    max_h = max(8, ny - 2 * margin)
+    max_h = max(8, ny - 2 * margin - band)
     source = _paper_crop(image)
     scale = min(max_w / source.width, max_h / source.height)
     fitted = source.resize(
@@ -74,7 +81,7 @@ def fit_on_plate(image: Image.Image, config: PlateConfig) -> tuple[Image.Image, 
         Image.Resampling.LANCZOS,
     )
     x0 = (nx - fitted.width) // 2
-    y0 = (ny - fitted.height) // 2
+    y0 = (ny - band - fitted.height) // 2
     canvas = Image.new("RGB", (nx, ny), "white")
     canvas.paste(fitted, (x0, y0))
     return canvas, (x0, y0, x0 + fitted.width, y0 + fitted.height)
@@ -190,23 +197,89 @@ def _halftone_mask(corrected: Image.Image, config: PlateConfig) -> np.ndarray:
     return mask
 
 
-def _color_masks(corrected: Image.Image, config: PlateConfig) -> list[tuple[str, str, np.ndarray]]:
-    image = corrected.convert("RGB")
-    quantized = image.quantize(
-        colors=config.color_count,
-        method=Image.Quantize.MEDIANCUT,
-        dither=Image.Dither.NONE,
+def _ink_color(rgb: np.ndarray) -> str:
+    """Real artwork colour, nudged a little richer so it reads as printing ink."""
+    rgb = rgb.astype(np.float64)
+    gray = float(np.mean(rgb))
+    rich = np.clip(gray + (rgb - gray) * 1.25, 0, 255) * 0.94
+    return "#" + "".join(f"{int(round(v)):02x}" for v in rich)
+
+
+def _to_lab(rgb: np.ndarray) -> np.ndarray:
+    """sRGB (0..255) to CIELAB, so clusters follow perceived colour differences."""
+    c = rgb.astype(np.float64) / 255.0
+    c = np.where(c > 0.04045, ((c + 0.055) / 1.055) ** 2.4, c / 12.92)
+    m = np.array([[0.4124, 0.3576, 0.1805], [0.2126, 0.7152, 0.0722], [0.0193, 0.1192, 0.9505]])
+    xyz = c @ m.T / np.array([0.95047, 1.0, 1.08883])
+    f = np.where(xyz > 0.008856, np.cbrt(xyz), 7.787 * xyz + 16 / 116)
+    return np.stack([116 * f[..., 1] - 16, 500 * (f[..., 0] - f[..., 1]), 200 * (f[..., 1] - f[..., 2])], -1)
+
+
+def _kmeans_palette(pixels: np.ndarray, count: int, seed: int) -> tuple[np.ndarray, np.ndarray]:
+    """k-means++ in Lab on a pixel sample; returns RGB palette and a label image."""
+    height, width = pixels.shape[:2]
+    flat = pixels.reshape(-1, 3)
+    lab = _to_lab(flat)
+    rng = np.random.default_rng(seed)
+    sample = lab[rng.choice(len(lab), size=min(len(lab), 24_000), replace=False)]
+    centers = [sample[rng.integers(len(sample))]]
+    for _ in range(1, count):
+        d2 = np.min(((sample[:, None, :] - np.array(centers)[None]) ** 2).sum(-1), axis=1)
+        centers.append(sample[rng.choice(len(sample), p=d2 / max(d2.sum(), 1e-9))])
+    centers = np.array(centers)
+    for _ in range(30):
+        assign = np.argmin(((sample[:, None, :] - centers[None]) ** 2).sum(-1), axis=1)
+        moved = np.array([
+            sample[assign == k].mean(0) if np.any(assign == k) else centers[k] for k in range(count)
+        ])
+        if np.allclose(moved, centers, atol=0.05):
+            break
+        centers = moved
+    labels = np.empty(len(lab), dtype=np.int32)
+    for start in range(0, len(lab), 200_000):
+        chunk = lab[start : start + 200_000]
+        labels[start : start + 200_000] = np.argmin(((chunk[:, None, :] - centers[None]) ** 2).sum(-1), axis=1)
+    palette = np.array([
+        flat[labels == k].mean(0) if np.any(labels == k) else [255, 255, 255] for k in range(count)
+    ]).clip(0, 255).astype(np.uint8)
+    return palette, labels.reshape(height, width)
+
+
+def _color_masks(
+    image: Image.Image,
+    config: PlateConfig,
+    content_box: tuple[int, int, int, int] | None = None,
+) -> list[tuple[str, str, np.ndarray]]:
+    """Split the artwork into ``color_count`` ink plates plus untouched paper.
+
+    Clustering runs on the real colours inside the artwork only (the white
+    padding around it would otherwise steal a cluster), and one extra cluster
+    is reserved for the paper so N colours really means N plates.
+    """
+    rgb = image.convert("RGB")
+    full = np.asarray(rgb)
+    if content_box is None:
+        content_box = (0, 0, rgb.width, rgb.height)
+    x0, y0, x1, y1 = content_box
+    crop = rgb.crop(content_box)
+    # A gentle blur keeps paper grain and JPEG noise from becoming speckle plates.
+    smooth = Image.fromarray(
+        ndimage.median_filter(np.asarray(crop), size=(3, 3, 1)).astype(np.uint8)
     )
-    labels = np.asarray(quantized)
-    palette = np.asarray(quantized.getpalette(), dtype=np.uint8).reshape(-1, 3)[: config.color_count]
-    order = np.argsort(0.2126 * palette[:, 0] + 0.7152 * palette[:, 1] + 0.0722 * palette[:, 2])
+    count = config.color_count + 1
+    palette, labels_crop = _kmeans_palette(np.asarray(smooth), count, config.proof_seed)
+    labels = np.full(full.shape[:2], -1, dtype=np.int32)
+    labels[y0:y1, x0:x1] = labels_crop
+    luminance = 0.2126 * palette[:, 0] + 0.7152 * palette[:, 1] + 0.0722 * palette[:, 2]
+    order = [int(i) for i in np.argsort(luminance) if np.any(labels_crop == i)]
+    paper = order[-1] if len(order) > 1 else None
+
     result = []
-    for rank, palette_id in enumerate(order):
-        color = palette[palette_id]
-        luminance = float(0.2126 * color[0] + 0.7152 * color[1] + 0.0722 * color[2])
-        if luminance > 244 and rank == len(order) - 1:
+    for palette_id in order:
+        if palette_id == paper:
             continue
-        result.append((f"plate_{rank + 1}", PALETTE[rank % len(PALETTE)], labels == palette_id))
+        rank = len(result)
+        result.append((f"plate_{rank + 1}", _ink_color(palette[palette_id]), labels == palette_id))
     return result
 
 
@@ -214,9 +287,10 @@ def make_masks(
     corrected: Image.Image,
     config: PlateConfig,
     content_box: tuple[int, int, int, int] | None = None,
+    source: Image.Image | None = None,
 ) -> tuple[list[tuple[str, str, np.ndarray]], list[dict]]:
     if config.style == "color_layers":
-        candidates = _color_masks(corrected, config)
+        candidates = _color_masks(source if source is not None else corrected, config, content_box)
     else:
         generators = {
             "woodcut": _woodcut_mask,
@@ -235,6 +309,8 @@ def make_masks(
             content_box,
         )
         if np.count_nonzero(cleaned):
+            if config.uses_registration():
+                cleaned = cleaned | registration_mask(cleaned.shape, config)
             layers.append((name, color, cleaned))
             reports.append(report)
     if not layers:
