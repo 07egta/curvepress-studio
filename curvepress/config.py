@@ -32,7 +32,14 @@ class PlateConfig:
     halftone_pitch_mm: float = 1.70
     halftone_min_dot_mm: float = 0.50
     halftone_max_dot_mm: float = 1.60
+    registration_marks: bool = True
+    registration_band_mm: float = 6.0
+    proof_seed: int = 7
     title: str = "curvepress_plate"
+
+    def uses_registration(self) -> bool:
+        """Kento marks are only meaningful when several plates must line up."""
+        return self.style == "color_layers" and self.registration_marks
 
     @staticmethod
     def _layer_round(value: float, layer: float) -> float:
@@ -70,6 +77,7 @@ class PlateConfig:
         data["detail"] = float(max(0.0, min(1.0, self.detail)))
         data["contrast"] = float(max(0.0, min(1.0, self.contrast)))
         data["color_count"] = int(max(2, min(6, self.color_count)))
+        data["registration_band_mm"] = float(max(4.0, min(14.0, self.registration_band_mm)))
         data["title"] = "".join(c if c.isalnum() or c in "-_" else "_" for c in self.title)[:80]
         return PlateConfig(**data)
 

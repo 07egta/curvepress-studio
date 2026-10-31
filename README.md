@@ -8,7 +8,7 @@ Turn artwork into a printable relief plate with a local, beautiful, three-click 
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-111111.svg)](LICENSE)
-[![Tests](https://github.com/taichiro20100723-droid/curvepress-studio/actions/workflows/test.yml/badge.svg)](https://github.com/taichiro20100723-droid/curvepress-studio/actions/workflows/test.yml)
+[![Tests](https://github.com/07egta/curvepress-studio/actions/workflows/test.yml/badge.svg)](https://github.com/07egta/curvepress-studio/actions/workflows/test.yml)
 ![Status: Alpha](https://img.shields.io/badge/status-alpha-F59E0B.svg)
 
 **English · [日本語](#日本語) · [中文](#中文)**
@@ -17,7 +17,7 @@ Turn artwork into a printable relief plate with a local, beautiful, three-click 
 
 > Start with Hokusai's *Great Wave*. In about 30 seconds, turn it into a relief plate you can preview, export, and print.
 >
-> **[Download the source ZIP](https://github.com/taichiro20100723-droid/curvepress-studio/archive/refs/heads/main.zip)** · **[See the showcase](docs/SHOWCASE.md)** · **[Try the examples](examples/)**
+> **[Download the source ZIP](https://github.com/07egta/curvepress-studio/archive/refs/heads/main.zip)** · **[See the showcase](docs/SHOWCASE.md)** · **[Try the examples](examples/)**
 
 ## What it does
 
@@ -46,6 +46,15 @@ flowchart LR
     E --> F[Print & test]
 ```
 
+## New in 0.2 — from plate to paper
+
+- **Pulled proof** — see the print on washi paper before you print anything: ink mottling from the baren, edge pooling, paper fibres, and a little colour drift between plates.
+- **3D plate** — rotate the real, mirrored plate in the browser (WebGL 2, works offline). Switch plates and exaggerate the relief ×3.
+- **Kento registration marks** — colour plates get the classic Japanese *kagi* (L) and *hikitsuke* (straight) stops at identical positions, so every colour lands in the same place. A band is reserved so they never touch the art.
+<p align="center"><img src="docs/images/proof-hokusai-4color.jpg" width="62%" alt="Simulated 4-colour proof of Hokusai's Great Wave"> <img src="docs/images/plate-3d.jpg" width="34%" alt="3D view of the mirrored plate with kento marks"></p>
+
+- **True-colour separation** — plates now take their ink colours from the artwork (Lab k-means), the paper colour is left uninked, and N colours really means N plates.
+
 ## Highlights
 
 - Five practical styles: woodcut, line art, photo halftone, poster, and 2–6 color separation
@@ -64,7 +73,7 @@ flowchart LR
 Python 3.11 or newer is required. The CAD extra enables STEP, 3MF, and STL export.
 
 ```bash
-git clone https://github.com/taichiro20100723-droid/curvepress-studio.git
+git clone https://github.com/07egta/curvepress-studio.git
 cd curvepress-studio
 python -m venv .venv
 ```
@@ -112,7 +121,7 @@ These are compact, public-domain reproductions sourced from [Wikimedia Commons](
 ## 30-second masterpiece demo
 
 ```bash
-git clone https://github.com/taichiro20100723-droid/curvepress-studio.git
+git clone https://github.com/07egta/curvepress-studio.git
 cd curvepress-studio
 python -m venv .venv
 ```
@@ -180,6 +189,13 @@ CurvePress Studioは、写真・スキャン・ロゴ・線画を、FDM方式の
 
 画像は自分のPC上で処理され、クラウドの画像サービスへ送信されません。
 
+### 0.2の新機能 — 版から紙へ
+
+- **刷り上がり** — 印刷する前に、和紙に刷ったときの見た目を確認（バレンのムラ・縁のインク溜まり・紙の繊維・色ごとの小さなズレ）
+- **3D版** — 実物と同じ鏡像の版をブラウザで回して確認（WebGL 2・オフライン動作）。版の切り替え、高さ×3強調つき
+- **見当（けんとう）** — 多色版に、伝統木版の「かぎ見当」「引きつけ見当」を全版同じ位置に自動で付ける。紙の角と辺を当てるだけで色がぴったり重なる
+- **本物の色で色分解** — 版のインク色を原画の色から自動抽出（Lab k-means）。紙の色は刷らない色として除外し、「N色＝N枚の版」に
+
 ### できること
 
 - 木版画、線画、写真ハーフトーン、ポスター、2〜6色分版の5スタイル
@@ -205,6 +221,8 @@ Python 3.11以上を用意し、上の **Quick start** の手順で起動して�
 CurvePress Studio 可以把照片、扫描件、线稿和海报转换成适合FDM 3D打印的浮雕版。图像在本地处理，不会上传到云端图像服务。
 
 从 `examples/` 中选择葛饰北斋、蒙娜丽莎或《星月夜》，在网页界面点击 **Hokusai sample** 或对应的示例卡片，然后比较木刻、照片半色调和颜色分离效果。最后可以导出 SVG、STEP、3MF 和 STL。
+
+**0.2 新功能：** 和纸印刷效果预览、可旋转的 3D 版面、多色版自动添加日本木版传统的规矩（套准标记）、按原画真实颜色分色。
 
 项目支持日本語、English 和中文界面，欢迎提交 Issue 或 Pull Request。
 

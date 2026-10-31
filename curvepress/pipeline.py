@@ -19,6 +19,7 @@ from .image_pipeline import (
     mask_preview,
 )
 from .models import AnalysisResult, PlateLayer
+from .proof import make_heightmap, make_proof
 
 
 def _save_curve_preview(layers: list[PlateLayer], config: PlateConfig) -> Image.Image:
@@ -52,7 +53,7 @@ def analyze_image(
     source_original = load_image(data)
     source, content_box = fit_on_plate(source_original, config)
     corrected = correct_illumination(source, config.contrast)
-    mask_layers, cleanup_reports = make_masks(corrected, config, content_box)
+    mask_layers, cleanup_reports = make_masks(corrected, config, content_box, source)
 
     layers: list[PlateLayer] = []
     all_metrics = []
@@ -78,9 +79,11 @@ def analyze_image(
     corrected.save(directory / "corrected.png")
     print_preview.save(directory / "print-preview.png")
     curve_preview.save(directory / "curve-preview.png")
+    make_proof(layers, config).save(directory / "proof-preview.png")
     for layer in layers:
         mask_preview(layer.mask, layer.color_hex).save(directory / f"{layer.name}-mask.png")
         (directory / f"{layer.name}.svg").write_text(layer.svg, encoding="utf-8")
+        make_heightmap(layer, config).save(directory / f"{layer.name}-height.png")
 
     total_segments = sum(item["bezier_segments"] for item in all_metrics)
     warnings = []
@@ -96,6 +99,7 @@ def analyze_image(
         "relief_height_mm": config.relief_height_mm,
         "total_height_mm": config.base_height_mm + config.relief_height_mm,
         "mirrored_for_print": config.mirror_for_print,
+        "registration_marks": config.uses_registration(),
         "layers": all_metrics,
         "total_bezier_segments": total_segments,
         "auto_settings": config.public_dict(),

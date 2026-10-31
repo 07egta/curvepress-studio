@@ -135,9 +135,27 @@ def _face_for_region(
     return face if occ["BRepCheck_Analyzer"](face).IsValid() else None
 
 
+def _overshoots(face, region: CurveRegion, config: PlateConfig, occ, limit: float = 0.25) -> bool:
+    box = occ["Bnd_Box"]()
+    occ["BRepBndLib"].AddOptimal_s(face, box, True, False)
+    xmin, ymin, _, xmax, ymax, _ = box.Get()
+    pts = np.asarray(region.outer, dtype=np.float64)
+    xs = config.width_mm - pts[:, 0] if config.mirror_for_print else pts[:, 0]
+    ys = config.height_mm - pts[:, 1]
+    return bool(
+        xmin < xs.min() - limit or xmax > xs.max() + limit
+        or ymin < ys.min() - limit or ymax > ys.max() + limit
+    )
+
+
 def _make_relief(region: CurveRegion, config: PlateConfig, overlap: float, occ):
     z = config.base_height_mm - overlap
     face = _face_for_region(region, config, z, occ, safe_bezier=False)
+    if face is not None and _overshoots(face, region, config, occ):
+        # Periodic interpolation can ring around sharp corners (kento marks,
+        # crisp lettering).  The Bezier chain passes through every vertex
+        # with bounded tangents, so it never leaves the contour's hull much.
+        face = None
     if face is None:
         face = _face_for_region(region, config, z, occ, safe_bezier=True)
     if face is None:

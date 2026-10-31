@@ -112,3 +112,43 @@ def apply_printability(
     }
     return result, metrics
 
+
+
+def registration_mask(shape: tuple[int, int], config: PlateConfig) -> np.ndarray:
+    """Japanese woodblock kento marks, identical on every colour plate.
+
+    * kagi-kento: an L-shaped corner stop at the bottom-right of the image.
+    * hikitsuke-kento: a straight edge stop at the bottom-left.
+
+    Both live in the reserved bottom band (see ``fit_on_plate``), so the paper's
+    corner and bottom edge can be pushed against the same ridges for every
+    colour.  Coordinates are in un-mirrored image space; the CAD mirror flips
+    them together with the artwork, so all plates stay consistent.
+    """
+    height, width = shape
+    ppm = config.analysis_ppm
+    mask = np.zeros(shape, dtype=bool)
+    margin = config.edge_margin_mm
+    band = config.registration_band_mm
+    stroke = max(config.minimum_width_mm * 2.0, 1.2)
+    # Bottom edge of the mark sits on the inside of the safety margin.
+    y_bottom = config.height_mm - margin
+    y_top = y_bottom - stroke
+    arm = min(14.0, config.width_mm * 0.18)
+    leg = max(stroke * 2.0, min(band - 1.0, 4.5))
+
+    def box(x0: float, y0: float, x1: float, y1: float) -> None:
+        a = int(round(max(0.0, x0) * ppm))
+        b = int(round(min(config.width_mm, x1) * ppm))
+        c = int(round(max(0.0, y0) * ppm))
+        d = int(round(min(config.height_mm, y1) * ppm))
+        mask[max(0, c) : min(height, d), max(0, a) : min(width, b)] = True
+
+    right = config.width_mm - margin
+    # kagi (L): horizontal arm + vertical leg rising into the band.
+    box(right - arm, y_top, right, y_bottom)
+    box(right - stroke, y_bottom - leg, right, y_bottom)
+    # hikitsuke (straight bar).
+    left = margin
+    box(left, y_top, left + arm, y_bottom)
+    return mask
