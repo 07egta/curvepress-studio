@@ -39,16 +39,17 @@ def _component_cleanup(mask: np.ndarray, config: PlateConfig) -> np.ndarray:
         return mask
     sizes = np.bincount(labels.ravel())
     threshold = config.minimum_component_mm2 * config.analysis_ppm**2
-    keep = np.zeros_like(mask, dtype=bool)
-    for label_id in range(1, count + 1):
-        ys, xs = np.where(labels == label_id)
-        if not len(xs):
+    keep_labels = sizes >= threshold
+    keep_labels[0] = False
+    # Bounding boxes give the same diagonal without rescanning the full image
+    # once for each of the thousands of halftone dots.
+    for label_id, box in enumerate(ndimage.find_objects(labels), start=1):
+        if box is None or keep_labels[label_id]:
             continue
-        diagonal_mm = float(np.hypot(np.ptp(xs), np.ptp(ys))) / config.analysis_ppm
-        # Long thin strokes are meaningful curves, not speckle noise.
-        if sizes[label_id] >= threshold or diagonal_mm >= config.minimum_width_mm * 3.0:
-            keep[labels == label_id] = True
-    return keep
+        y, x = box
+        diagonal_mm = float(np.hypot(x.stop - x.start - 1, y.stop - y.start - 1)) / config.analysis_ppm
+        keep_labels[label_id] = diagonal_mm >= config.minimum_width_mm * 3.0
+    return keep_labels[labels]
 
 
 def _fill_tiny_holes(mask: np.ndarray, config: PlateConfig) -> np.ndarray:
@@ -59,11 +60,10 @@ def _fill_tiny_holes(mask: np.ndarray, config: PlateConfig) -> np.ndarray:
     sizes = np.bincount(labels.ravel())
     border_labels = set(labels[0, :]) | set(labels[-1, :]) | set(labels[:, 0]) | set(labels[:, -1])
     threshold = (config.minimum_gap_mm * 0.85 * config.analysis_ppm) ** 2
-    result = mask.copy()
-    for label_id in range(1, count + 1):
-        if label_id not in border_labels and sizes[label_id] < threshold:
-            result[labels == label_id] = True
-    return result
+    fill = sizes < threshold
+    fill[list(border_labels)] = False
+    fill[0] = False
+    return mask | fill[labels]
 
 
 def apply_printability(
@@ -92,10 +92,11 @@ def apply_printability(
 
     margin = int(round(config.edge_margin_mm * config.analysis_ppm))
     margin = min(margin, result.shape[0] // 4, result.shape[1] // 4)
-    result[:margin, :] = False
-    result[-margin:, :] = False
-    result[:, :margin] = False
-    result[:, -margin:] = False
+    if margin:
+        result[:margin, :] = False
+        result[-margin:, :] = False
+        result[:, :margin] = False
+        result[:, -margin:] = False
 
     distance = ndimage.distance_transform_edt(result) / config.analysis_ppm
     fragile = result & (distance < config.nozzle_mm * 0.50)
@@ -111,4 +112,5 @@ def apply_printability(
         "minimum_gap_mm": config.minimum_gap_mm,
     }
     return result, metrics
+
 

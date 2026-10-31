@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import struct
+import tempfile
 import zipfile
 from collections import Counter
 from pathlib import Path
@@ -137,11 +138,11 @@ def _face_for_region(
 
 def _make_relief(region: CurveRegion, config: PlateConfig, overlap: float, occ):
     z = config.base_height_mm - overlap
-    face = _face_for_region(region, config, z, occ, safe_bezier=False)
+    # Match the SVG cubic chain exactly; periodic interpolation can overshoot
+    # narrow gaps and silently change the printed artwork.
+    face = _face_for_region(region, config, z, occ, safe_bezier=True)
     if face is None:
-        face = _face_for_region(region, config, z, occ, safe_bezier=True)
-    if face is None:
-        raise RuntimeError("artwork face is invalid after B-spline and safe-Bezier fitting")
+        raise RuntimeError("artwork face is invalid after shape-preserving Bezier fitting")
     solid = occ["BRepPrimAPI_MakePrism"](
         face, occ["gp_Vec"](0.0, 0.0, config.relief_height_mm + overlap)
     ).Shape()
@@ -163,8 +164,8 @@ def build_occ_solid(layer: PlateLayer, config: PlateConfig):
     occ = _load_occ()
     if len(layer.regions) > 1600:
         raise RuntimeError(
-            "This layer has more than 1,600 separate regions. STEP is intentionally blocked "
-            "to avoid a huge, fragile CAD file; use 3MF/STL or increase cleanup."
+            "This layer has more than 1,600 separate regions. CAD export is intentionally blocked "
+            "to avoid a huge, fragile file; lower the detail or use a larger dot pitch."
         )
     overlap = min(0.03, config.layer_height_mm * 0.10)
     reliefs = []
@@ -225,6 +226,8 @@ def _bounds(shape, occ) -> list[float]:
 
 def _read_binary_stl(path: Path) -> tuple[np.ndarray, np.ndarray]:
     raw = path.read_bytes()
+    if len(raw) < 84:
+        raise RuntimeError("truncated binary STL")
     count = struct.unpack_from("<I", raw, 80)[0]
     expected = 84 + count * 50
     if len(raw) != expected:
@@ -353,7 +356,14 @@ def export_analysis(result: AnalysisResult, raw_config: PlateConfig | dict) -> l
         else PlateConfig.from_dict(raw_config)
     )
     reports = []
-    for layer in result.layers:
-        reports.append(export_layer(layer, config, result.directory))
+    # Publish only a complete, validated set. A failed layer must not leave
+    # an apparently downloadable STL from an unsuccessful export.
+    with tempfile.TemporaryDirectory(prefix=".export-", dir=result.directory) as temporary:
+        staging = Path(temporary)
+        for layer in result.layers:
+            reports.append(export_layer(layer, config, staging))
+        for path in staging.iterdir():
+            path.replace(result.directory / path.name)
     return reports
+
 

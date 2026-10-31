@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.2.0 — 2026-10-31
+
+- Validate and convert numeric settings from the browser; reject invalid or nonfinite dimensions and preserve zero margins.
+- Keep transparent images on a white background and preserve blank white inputs.
+- Invalidate previous results when inputs change; ignore stale image, analysis, and export responses.
+- Match CAD faces to the SVG cubic Bezier chains and preview the actual curve orientation.
+- Speed up halftone rasterization and connected-component/hole cleanup without changing pixels.
+- Honor the scan-frame switch; show actual quantized ink colors and an A1 mini bed-size warning.
+- Serialize CAD work, reserve export jobs atomically, publish only complete validated exports, and download analysis ZIPs before CAD.
+- Bundle sample assets in wheels, repair interrupted launcher setup, and add CAD/packaging CI.
+
+
 All notable changes to CurvePress Studio are documented here.
 
 CurvePress is in alpha. Version notes describe the repository state and may not represent a packaged release.
@@ -46,4 +58,5 @@ CurvePress is in alpha. Version notes describe the repository state and may not 
 - ノズル径に合わせた自動クリーンアップとプレート寸法調整。
 - STEP再読み込み、BRep、寸法、閉じたメッシュの検証に対応。
 - ローカルWeb UIとCLIを追加。
+
 

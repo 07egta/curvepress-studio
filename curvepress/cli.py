@@ -24,6 +24,8 @@ def _config_from_args(args: argparse.Namespace) -> PlateConfig:
         invert=args.invert,
         mirror_for_print=not args.no_mirror,
         title=args.title or Path(args.image).stem,
+        halftone_pitch_mm=args.dot_pitch,
+        remove_scan_frame=not args.keep_scan_frame,
     ).resolved()
 
 
@@ -79,6 +81,8 @@ def build_parser() -> argparse.ArgumentParser:
     convert.add_argument("--invert", action="store_true")
     convert.add_argument("--no-mirror", action="store_true")
     convert.add_argument("--svg-only", action="store_true")
+    convert.add_argument("--dot-pitch", type=float, default=1.7, help="halftone dot spacing in mm")
+    convert.add_argument("--keep-scan-frame", action="store_true", help="preserve the full source image edges")
     convert.set_defaults(func=convert_command)
 
     server = sub.add_parser("serve", help="open the local CurvePress Studio UI")
@@ -98,4 +102,5 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     return int(args.func(args))
+
 

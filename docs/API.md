@@ -20,7 +20,7 @@ The CurvePress Studio API is intended for local use on `127.0.0.1`. It does not 
 }
 ```
 
-Returns preview URLs, per-plate SVG files, physical and curve metrics, and warnings.
+Use Content-Type: application/json. Returns preview URLs, per-plate SVG files, an immediately downloadable analysis ZIP (`bundle`), physical and curve metrics, and warnings. Numeric strings are accepted for number settings; booleans must be JSON booleans.
 
 ## `POST /api/export`
 
@@ -28,7 +28,7 @@ Returns preview URLs, per-plate SVG files, physical and curve metrics, and warni
 {"job_id": "returned-job-id"}
 ```
 
-Starts background generation of STEP/3MF/STL files and validation JSON.
+Queues background generation of STEP/3MF/STL files and validation JSON. Repeated requests for a queued, running, or completed job reuse that export. CAD work is serialized; files appear only after the complete set passes validation.
 
 ## `GET /api/export/{job_id}`
 
@@ -38,3 +38,6 @@ Returns `idle`, `queued`, `running`, `done`, or `error`. The `done` response inc
 
 Returns a generated preview, SVG, CAD file, or validation result.
 
+
+
+The server retains the 12 most recent inactive analyses in memory. Files remain in the output directory after eviction or server restart, but artifact URLs require an in-memory job. Active exports are not evicted.
