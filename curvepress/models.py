@@ -34,3 +34,4 @@ class AnalysisResult:
     warnings: list[str]
     directory: Path
 
+

@@ -65,3 +65,4 @@ These are conservative starting rules that keep slicer-impossible details out of
 - Accepting an unreadable STEP or an open mesh
 - Unlimited triangle growth just to preserve every detail
 
+

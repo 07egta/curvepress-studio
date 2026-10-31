@@ -60,6 +60,18 @@ class ReliabilityTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'no printable artwork'):
             analyze_image(encoded(Image.new('RGB', (80, 60), 'white')), PlateConfig())
 
+    def test_degenerate_color_palette_and_seed_validation(self):
+        from curvepress.image_pipeline import _kmeans_palette
+        palette, labels = _kmeans_palette(np.full((16, 20, 3), 255, dtype=np.uint8), 4, 7)
+        self.assertEqual(labels.shape, (16, 20))
+        self.assertTrue(np.all(palette == 255))
+        with self.assertRaisesRegex(ValueError, 'no printable artwork'):
+            analyze_image(encoded(Image.new('RGB', (80, 60), 'white')), PlateConfig(style='color_layers'))
+        with self.assertRaises(ValueError):
+            PlateConfig(proof_seed=-1).resolved()
+        with self.assertRaises(ValueError):
+            PlateConfig(registration_marks='false').resolved()
+
     def test_lookup_cleanup_matches_full_canvas_reference(self):
         rng = np.random.default_rng(42)
         mask = ndimage.binary_dilation(rng.random((143, 191)) > .98)
@@ -88,6 +100,8 @@ class ReliabilityTests(unittest.TestCase):
             results = [analyze_image(encoded(artwork()), PlateConfig(width_mm=50, height_mm=35, style='poster', mirror_for_print=flag), Path(tmp)) for flag in (True, False)]
             np.testing.assert_array_equal(np.asarray(results[0].print_preview)[:, ::-1], results[1].print_preview)
             np.testing.assert_array_equal(np.asarray(results[0].curve_preview)[:, ::-1], results[1].curve_preview)
+            proofs = [np.asarray(Image.open(result.directory / 'proof-preview.png')) for result in results]
+            np.testing.assert_array_equal(proofs[0][:, ::-1], proofs[1])
 
     def test_failed_export_does_not_publish_partial_files(self):
         with tempfile.TemporaryDirectory() as tmp:
