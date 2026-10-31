@@ -19,13 +19,17 @@ if not defined PYTHON_EXE (
     pause
     exit /b 1
   )
-  .venv\Scripts\python.exe -m pip install -e ".[cad]"
+  set "PYTHON_EXE=%~dp0.venv\Scripts\python.exe"
+)
+
+rem Retry incomplete installations and update source-checkout dependencies.
+if not exist "%~dp0runtime\python.exe" (
+  "%PYTHON_EXE%" -m pip install -e ".[cad]"
   if errorlevel 1 (
     echo Installation failed. Check your internet connection and try again.
     pause
     exit /b 1
   )
-  set "PYTHON_EXE=%~dp0.venv\Scripts\python.exe"
 )
 
 start "CurvePress server" /min "%PYTHON_EXE%" -m curvepress serve --no-browser
@@ -49,4 +53,5 @@ if defined BROWSER (
 ) else (
   start "" http://127.0.0.1:8765
 )
+
 

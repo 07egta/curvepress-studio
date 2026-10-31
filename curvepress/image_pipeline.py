@@ -67,7 +67,8 @@ def fit_on_plate(image: Image.Image, config: PlateConfig) -> tuple[Image.Image, 
     margin = int(round(config.edge_margin_mm * config.analysis_ppm))
     max_w = max(8, nx - 2 * margin)
     max_h = max(8, ny - 2 * margin)
-    source = _paper_crop(image)
+    # Honor the scan-frame toggle before cropping any source image pixels.
+    source = _paper_crop(image) if config.remove_scan_frame else image
     scale = min(max_w / source.width, max_h / source.height)
     fitted = source.resize(
         (max(1, int(round(source.width * scale))), max(1, int(round(source.height * scale)))),
@@ -98,7 +99,11 @@ def correct_illumination(image: Image.Image, contrast: float) -> Image.Image:
     ratio = enhanced / np.maximum(luminance, 8.0)
     corrected = balanced * ratio[..., None]
     lo, hi = np.percentile(corrected, (0.5, 99.5), axis=(0, 1))
-    corrected = (corrected - lo) / np.maximum(hi - lo, 1.0)
+    corrected = np.where(
+        hi - lo >= 1.0,
+        (corrected - lo) / np.maximum(hi - lo, 1.0),
+        corrected / 255.0,
+    )
     return Image.fromarray(np.clip(7.0 + corrected * 243.0, 0, 255).astype(np.uint8))
 
 
@@ -172,7 +177,6 @@ def _halftone_mask(corrected: Image.Image, config: PlateConfig) -> np.ndarray:
     cx, cy = width * 0.5, height * 0.5
     diagonal = int(math.ceil(math.hypot(width, height)))
     mask = np.zeros((height, width), dtype=bool)
-    yy, xx = np.ogrid[:height, :width]
 
     for gy in range(-diagonal, diagonal + pitch, pitch):
         for gx in range(-diagonal, diagonal + pitch, pitch):
@@ -185,8 +189,16 @@ def _halftone_mask(corrected: Image.Image, config: PlateConfig) -> np.ndarray:
             if tone < 0.055:
                 continue
             radius = min_radius + (max_radius - min_radius) * tone**0.72
-            disk = (xx - x) ** 2 + (yy - y) ** 2 <= radius**2
-            mask |= disk
+            # Restrict each dot to its local bounds instead of rasterizing the full plate.
+            # Keep the same floating-point center, radius and pixel inclusion rule.
+            x0 = max(0, math.floor(x - radius))
+            x1 = min(width, math.ceil(x + radius) + 1)
+            y0 = max(0, math.floor(y - radius))
+            y1 = min(height, math.ceil(y + radius) + 1)
+            if x0 >= x1 or y0 >= y1:
+                continue
+            yy, xx = np.ogrid[y0:y1, x0:x1]
+            mask[y0:y1, x0:x1] |= (xx - x) ** 2 + (yy - y) ** 2 <= radius**2
     return mask
 
 
@@ -206,7 +218,8 @@ def _color_masks(corrected: Image.Image, config: PlateConfig) -> list[tuple[str,
         luminance = float(0.2126 * color[0] + 0.7152 * color[1] + 0.0722 * color[2])
         if luminance > 244 and rank == len(order) - 1:
             continue
-        result.append((f"plate_{rank + 1}", PALETTE[rank % len(PALETTE)], labels == palette_id))
+        color_hex = "#" + "".join(f"{int(channel):02x}" for channel in color)
+        result.append((f"plate_{rank + 1}", color_hex, labels == palette_id))
     return result
 
 
@@ -256,4 +269,5 @@ def composite_preview(layers: list[tuple[str, str, np.ndarray]]) -> Image.Image:
         ink = np.array([int(color[i : i + 2], 16) for i in (1, 3, 5)], dtype=np.uint8)
         rgb[mask] = ink
     return Image.fromarray(rgb)
+
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, fields
+import math
 from typing import Any
 
 
@@ -39,52 +40,84 @@ class PlateConfig:
         return round(max(layer, round(value / layer) * layer), 4)
 
     def resolved(self) -> "PlateConfig":
-        if self.style not in STYLES:
-            raise ValueError(f"unknown style: {self.style}")
-        if not (20 <= self.width_mm <= 256 and 20 <= self.height_mm <= 256):
-            raise ValueError("plate dimensions must be between 20 and 256 mm")
-        if not (0.2 <= self.nozzle_mm <= 1.2):
-            raise ValueError("nozzle diameter must be between 0.2 and 1.2 mm")
-        if not (0.05 <= self.layer_height_mm <= 0.5):
-            raise ValueError("layer height must be between 0.05 and 0.5 mm")
-
         data = asdict(self)
-        layer = self.layer_height_mm
-        data["base_height_mm"] = self.base_height_mm or self._layer_round(
-            max(0.80, self.nozzle_mm * 2.0), layer
-        )
-        data["relief_height_mm"] = self.relief_height_mm or self._layer_round(
-            max(1.00, self.nozzle_mm * 3.0), layer
-        )
-        data["edge_margin_mm"] = self.edge_margin_mm or max(2.00, self.nozzle_mm * 5.0)
-        data["minimum_width_mm"] = self.minimum_width_mm or max(0.50, self.nozzle_mm * 1.25)
-        data["minimum_gap_mm"] = self.minimum_gap_mm or max(0.50, self.nozzle_mm * 1.25)
-        data["minimum_component_mm2"] = self.minimum_component_mm2 or (
-            data["minimum_width_mm"] * 1.35
-        ) ** 2
-        # Tolerance scales with the nozzle but remains well below the printable line width.
-        data["curve_tolerance_mm"] = self.curve_tolerance_mm or max(
-            0.055, min(0.18, self.nozzle_mm * (0.18 + 0.18 * (1.0 - self.detail)))
-        )
-        data["analysis_ppm"] = int(max(4, min(12, self.analysis_ppm)))
-        data["detail"] = float(max(0.0, min(1.0, self.detail)))
-        data["contrast"] = float(max(0.0, min(1.0, self.contrast)))
-        data["color_count"] = int(max(2, min(6, self.color_count)))
-        data["title"] = "".join(c if c.isalnum() or c in "-_" else "_" for c in self.title)[:80]
+        optional = {
+            "base_height_mm", "relief_height_mm", "edge_margin_mm", "minimum_width_mm",
+            "minimum_gap_mm", "minimum_component_mm2", "curve_tolerance_mm",
+        }
+        flags = {"invert", "mirror_for_print", "remove_scan_frame"}
+        for field in fields(self):
+            key, value = field.name, data[field.name]
+            if key in {"title", "style"}:
+                if not isinstance(value, str):
+                    raise ValueError(f"{key} must be text")
+                continue
+            if key in flags:
+                if not isinstance(value, bool):
+                    raise ValueError(f"{key} must be true or false")
+                continue
+            if key in optional and value in (None, "", "auto"):
+                data[key] = None
+                continue
+            try:
+                if isinstance(value, bool):
+                    raise ValueError
+                number = float(value)
+                if not math.isfinite(number):
+                    raise ValueError
+            except (TypeError, ValueError, OverflowError) as exc:
+                raise ValueError(f"{key} must be a finite number") from exc
+            data[key] = number
+
+        if data["style"] not in STYLES:
+            raise ValueError(f"unknown style: {data['style']}")
+        for key, low, high in (
+            ("width_mm", 20, 256), ("height_mm", 20, 256), ("nozzle_mm", 0.2, 1.2),
+            ("layer_height_mm", 0.05, 0.5), ("halftone_pitch_mm", 0.2, 20),
+            ("halftone_min_dot_mm", 0.1, 20), ("halftone_max_dot_mm", 0.1, 20),
+        ):
+            if not low <= data[key] <= high:
+                raise ValueError(f"{key} must be between {low} and {high}")
+        data["detail"] = max(0.0, min(1.0, data["detail"]))
+        data["contrast"] = max(0.0, min(1.0, data["contrast"]))
+        data["analysis_ppm"] = int(max(4, min(12, data["analysis_ppm"])))
+        data["color_count"] = int(max(2, min(6, data["color_count"])))
+        nozzle, layer = data["nozzle_mm"], data["layer_height_mm"]
+        defaults = {
+            "base_height_mm": max(0.8, nozzle * 2),
+            "relief_height_mm": max(1.0, nozzle * 3),
+            "edge_margin_mm": max(2.0, nozzle * 5),
+            "minimum_width_mm": max(0.5, nozzle * 1.25),
+            "minimum_gap_mm": max(0.5, nozzle * 1.25),
+            "curve_tolerance_mm": max(0.055, min(0.18, nozzle * (0.36 - 0.18 * data["detail"]))),
+        }
+        for key, default in defaults.items():
+            if data[key] is None:
+                data[key] = default
+        if data["minimum_component_mm2"] is None:
+            data["minimum_component_mm2"] = (data["minimum_width_mm"] * 1.35) ** 2
+        for key in optional:
+            if data[key] < 0 or (key != "edge_margin_mm" and data[key] == 0):
+                raise ValueError(f"{key} must be {'nonnegative' if key == 'edge_margin_mm' else 'positive'}")
+        for key in ("base_height_mm", "relief_height_mm"):
+            if data[key] > 20:
+                raise ValueError(f"{key} must not exceed 20 mm")
+            data[key] = self._layer_round(data[key], layer)
+        if 2 * data["edge_margin_mm"] >= min(data["width_mm"], data["height_mm"]) - 2:
+            raise ValueError("edge margin leaves less than 2 mm of artwork space")
+        if data["halftone_min_dot_mm"] > min(data["halftone_max_dot_mm"], data["halftone_pitch_mm"] * 0.96):
+            raise ValueError("halftone minimum dot must fit within the maximum dot and pitch")
+        data["title"] = "".join(c if c.isalnum() or c in "-_" else "_" for c in data["title"])[:80] or "curvepress_plate"
         return PlateConfig(**data)
 
     @classmethod
     def from_dict(cls, raw: dict[str, Any]) -> "PlateConfig":
+        if not isinstance(raw, dict):
+            raise ValueError("config must be an object")
         allowed = cls.__dataclass_fields__.keys()
-        values = {key: value for key, value in raw.items() if key in allowed}
-        for key in (
-            "base_height_mm", "relief_height_mm", "edge_margin_mm", "minimum_width_mm",
-            "minimum_gap_mm", "minimum_component_mm2", "curve_tolerance_mm",
-        ):
-            if values.get(key) in ("", None, "auto"):
-                values[key] = None
-        return cls(**values).resolved()
+        return cls(**{key: value for key, value in raw.items() if key in allowed}).resolved()
 
     def public_dict(self) -> dict[str, Any]:
         return asdict(self.resolved())
+
 

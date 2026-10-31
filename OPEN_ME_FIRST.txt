@@ -1,14 +1,18 @@
-To start CurvePress Studio, double-click `Start.exe` in this folder.
+CurvePress Studio 0.2.0
 
-`Start.exe` keeps the command window hidden, performs the required startup steps, and opens the app in your browser.
-If Windows SmartScreen appears, choose **More info → Run anyway**.
+SOURCE CHECKOUT / SOURCE ZIP
+  Windows: double-click run_curvepress.bat
+  macOS / Linux: sh run_curvepress.command
+  Python 3.11+ and network access are needed for dependency installation.
+  Both launchers retry an incomplete installation.
 
-The Windows portable bundle includes Python and the CAD runtime, so no separate Python installation or pip setup is required. The first launch may take a little longer while the server starts. Later launches open the browser app at the top-left of the screen.
+WINDOWS PORTABLE APP
+  Download CurvePress-Studio-Windows from a successful "Windows portable app"
+  Actions run. Extract the entire ZIP, then run CurvePress/CurvePress.exe.
+  Keep the _internal folder beside the executable.
+  Python does not need to be installed separately.
+  Generated files: %LOCALAPPDATA%/CurvePress Studio/output
 
-If `Start.exe` cannot be launched, use `Open_CurvePress.bat` in the same folder.
-
-For manual startup:
-  curvepress serve
-
-To stop the server, close the visible `CurvePress server` window.
-
+Open http://127.0.0.1:8765 if the browser does not appear.
+Keep the server console open while using the app; close it to stop.
+For an A1 mini, keep the plate within 180 x 180 mm (170 mm recommended).

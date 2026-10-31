@@ -7,10 +7,13 @@ import threading
 import traceback
 import webbrowser
 import zipfile
+import importlib.util
+import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
+from . import __version__
 from .config import PlateConfig
 from .exporter import export_analysis
 from .models import AnalysisResult
@@ -21,6 +24,8 @@ STATIC_ROOT = Path(__file__).with_name("static")
 JOBS: dict[str, AnalysisResult] = {}
 EXPORTS: dict[str, dict] = {}
 LOCK = threading.Lock()
+CAD_LOCK = threading.Lock()
+MAX_JOBS = 12
 OUTPUT_ROOT = Path("curvepress-output").resolve()
 
 
@@ -35,6 +40,7 @@ def _artifact_url(job_id: str, name: str) -> str:
 def _analysis_payload(result: AnalysisResult) -> dict:
     return {
         "job_id": result.job_id,
+        "bundle": _artifact_url(result.job_id, f"CurvePress_{result.job_id}.zip"),
         "metrics": result.metrics,
         "warnings": result.warnings,
         "previews": {
@@ -64,18 +70,21 @@ def _bundle(result: AnalysisResult) -> Path:
             ".png", ".svg", ".step", ".stl", ".3mf", ".json"
         }
     ]
-    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED, compresslevel=6) as archive:
+    temporary = path.with_suffix(f".{uuid.uuid4().hex}.tmp")
+    with zipfile.ZipFile(temporary, "w", zipfile.ZIP_DEFLATED, compresslevel=6) as archive:
         for item in sorted(names):
             archive.write(item, item.name)
+    temporary.replace(path)
     return path
 
 
 def _run_export(job_id: str, config: PlateConfig) -> None:
     try:
-        with LOCK:
-            result = JOBS[job_id]
-            EXPORTS[job_id] = {"state": "running", "message": "Building CAD solids…"}
-        reports = export_analysis(result, config)
+        with CAD_LOCK:
+            with LOCK:
+                result = JOBS[job_id]
+                EXPORTS[job_id] = {"state": "running", "message": "Building CAD solids…"}
+            reports = export_analysis(result, config)
         bundle = _bundle(result)
         files = []
         for report in reports:
@@ -100,7 +109,7 @@ def _run_export(job_id: str, config: PlateConfig) -> None:
 
 
 class CurvePressHandler(BaseHTTPRequestHandler):
-    server_version = "CurvePress/0.1.1"
+    server_version = f"CurvePress/{__version__}"
 
     def log_message(self, fmt: str, *args) -> None:
         print(f"[CurvePress] {self.address_string()} {fmt % args}")
@@ -121,12 +130,20 @@ class CurvePressHandler(BaseHTTPRequestHandler):
         length = int(self.headers.get("Content-Length", "0"))
         if length <= 0 or length > 44 * 1024 * 1024:
             raise ValueError("request is empty or exceeds 44 MB")
-        return json.loads(self.rfile.read(length))
+        if self.headers.get_content_type() != "application/json":
+            raise ValueError("request must use application/json")
+        origin = self.headers.get("Origin")
+        if origin and urlparse(origin).netloc != self.headers.get("Host"):
+            raise ValueError("cross-origin requests are not allowed")
+        data = json.loads(self.rfile.read(length))
+        if not isinstance(data, dict):
+            raise ValueError("request must be a JSON object")
+        return data
 
     def do_GET(self) -> None:  # noqa: N802
         path = unquote(urlparse(self.path).path)
         if path == "/api/health":
-            self._json(200, {"ok": True, "version": "0.1.1"})
+            self._json(200, {"ok": True, "version": __version__, "cad_available": importlib.util.find_spec("OCP") is not None})
             return
         if path.startswith("/api/export/"):
             job_id = path.rsplit("/", 1)[-1]
@@ -176,7 +193,14 @@ class CurvePressHandler(BaseHTTPRequestHandler):
                 image_data = base64.b64decode(encoded, validate=True)
                 config = PlateConfig.from_dict(payload.get("config", {}))
                 result = analyze_image(image_data, config, OUTPUT_ROOT / "jobs")
+                _bundle(result)
                 with LOCK:
+                    while len(JOBS) >= MAX_JOBS:
+                        expired = next((key for key in JOBS if EXPORTS.get(key, {}).get("state") not in {"queued", "running"}), None)
+                        if expired is None:
+                            raise ValueError("Too many exports are active; wait for an export to finish")
+                        JOBS.pop(expired)
+                        EXPORTS.pop(expired, None)
                     JOBS[result.job_id] = result
                     EXPORTS[result.job_id] = {"state": "idle"}
                 self._json(200, _analysis_payload(result))
@@ -185,15 +209,21 @@ class CurvePressHandler(BaseHTTPRequestHandler):
                 job_id = str(payload.get("job_id", ""))
                 with LOCK:
                     result = JOBS.get(job_id)
+                    if result is None:
+                        raise ValueError("analyze an image before export")
                     current = EXPORTS.get(job_id, {})
-                if result is None:
-                    raise ValueError("analyze an image before export")
-                if current.get("state") == "running":
-                    self._json(202, current)
-                    return
-                config = PlateConfig.from_dict(result.metrics["auto_settings"])
+                    if current.get("state") in {"queued", "running", "done"}:
+                        self._json(202, current)
+                        return
+                    config = PlateConfig.from_dict(result.metrics["auto_settings"])
+                    EXPORTS[job_id] = {"state": "queued", "message": "Waiting for CAD export…"}
                 thread = threading.Thread(target=_run_export, args=(job_id, config), daemon=True)
-                thread.start()
+                try:
+                    thread.start()
+                except Exception:
+                    with LOCK:
+                        EXPORTS[job_id] = {"state": "error", "message": "Could not start export; retry."}
+                    raise
                 self._json(202, {"state": "queued"})
                 return
             self._json(404, {"error": "not found"})
@@ -226,4 +256,5 @@ def serve(
 
 if __name__ == "__main__":
     serve()
+
 

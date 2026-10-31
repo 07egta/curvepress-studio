@@ -6,10 +6,10 @@ import uuid
 from pathlib import Path
 
 import numpy as np
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageOps
 
 from .config import PlateConfig
-from .curves import contour_regions, curve_counts, regions_svg
+from .curves import contour_regions, cubic_segments, curve_counts, regions_svg
 from .image_pipeline import (
     composite_preview,
     correct_illumination,
@@ -27,16 +27,24 @@ def _save_curve_preview(layers: list[PlateLayer], config: PlateConfig) -> Image.
     image = Image.new("RGB", (width, height), (43, 58, 48))
     draw = ImageDraw.Draw(image)
     single_layer = len(layers) == 1
+
+    def sampled(points):
+        result = []
+        for p0, c1, c2, p3 in cubic_segments(points):
+            for t in np.linspace(0, 1, 9):
+                point = (1-t)**3*p0 + 3*(1-t)**2*t*c1 + 3*(1-t)*t*t*c2 + t**3*p3
+                result.append(tuple(point * ppm))
+        return result
+
     for layer in reversed(layers):
         color = (238, 174, 54) if single_layer else tuple(
             int(layer.color_hex[i : i + 2], 16) for i in (1, 3, 5)
         )
         for region in layer.regions:
-            outer = [(round(x * ppm), round(y * ppm)) for x, y in region.outer]
-            draw.polygon(outer, fill=color)
+            draw.polygon(sampled(region.outer), fill=color)
             for hole in region.holes:
-                draw.polygon([(round(x * ppm), round(y * ppm)) for x, y in hole], fill=(43, 58, 48))
-    return image
+                draw.polygon(sampled(hole), fill=(43, 58, 48))
+    return ImageOps.mirror(image) if config.mirror_for_print else image
 
 
 def analyze_image(
@@ -73,6 +81,8 @@ def analyze_image(
     directory.mkdir(parents=True, exist_ok=True)
 
     print_preview = composite_preview([(layer.name, layer.color_hex, layer.mask) for layer in layers])
+    if not config.mirror_for_print:
+        print_preview = ImageOps.mirror(print_preview)
     curve_preview = _save_curve_preview(layers, config)
     source.save(directory / "source.png")
     corrected.save(directory / "corrected.png")
@@ -84,7 +94,11 @@ def analyze_image(
 
     total_segments = sum(item["bezier_segments"] for item in all_metrics)
     warnings = []
+    if max(config.width_mm, config.height_mm) > 180:
+        warnings.append("Plate exceeds the A1 mini 180 × 180 mm bed; use a larger printer or reduce the size.")
     for item in all_metrics:
+        if item["regions"] > 1600:
+            warnings.append(f"{item['name']}: {item['regions']} regions exceed the CAD limit of 1,600; increase dot spacing or lower detail before export. SVG is available.")
         if item["fragile_fraction"] > 0.22:
             warnings.append(f"{item['name']}: fine-detail risk is high; use Arachne or lower detail")
         if item["fill_ratio"] > 0.72:
@@ -115,4 +129,5 @@ def analyze_image(
         warnings=warnings,
         directory=directory,
     )
+
 

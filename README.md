@@ -9,7 +9,7 @@ Turn artwork into a printable relief plate with a local, beautiful, three-click 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-111111.svg)](LICENSE)
 [![Tests](https://github.com/07egta/curvepress-studio/actions/workflows/test.yml/badge.svg)](https://github.com/07egta/curvepress-studio/actions/workflows/test.yml)
-![Status: Alpha](https://img.shields.io/badge/status-alpha-F59E0B.svg)
+![Status: Beta](https://img.shields.io/badge/status-beta-2563EB.svg)
 
 **English · [日本語](#日本語) · [中文](#中文)**
 
@@ -141,11 +141,15 @@ For a Bambu A1 mini with a 0.4 mm nozzle, start with PLA, 0.20 mm layer height, 
 
 Raised artwork receives ink; low areas remain the paper color. Physical results depend on the paper, ink, roller, flatness, and pressure, so begin with a small test print. See the [printing guide](docs/PRINTING.md).
 
+## Source launchers
+
+On Windows, double-click `run_curvepress.bat`. On macOS/Linux, run `sh run_curvepress.command` (macOS may require `chmod +x run_curvepress.command` before double-clicking). Python 3.11+ and internet access are required for the initial dependency installation. Both launchers retry an incomplete setup.
+
 ## Portable Windows bundle
 
-The separate portable Windows bundle can include Python and the CAD runtime. Place `Start.exe` beside the `runtime` and `curvepress` folders, then double-click it. `Open_CurvePress.bat` is the visible-console fallback.
+The **Windows portable app** GitHub Actions workflow builds `CurvePress-Studio-Windows.zip` and runs a real CAD export using the frozen executable before uploading it. Download the artifact from a successful workflow run, extract the entire ZIP, and double-click `CurvePress/CurvePress.exe`. Keep the `_internal` folder beside the executable. No separate Python installation is needed.
 
-The GitHub source repository intentionally excludes the large runtime and executable. Use the source setup above, or download a portable bundle from a release asset when one is published.
+The app opens the local browser UI and saves generated files under `%LOCALAPPDATA%/CurvePress Studio/output`. Keep the console open while using the app; close it to stop the server. This build is unsigned. Source launchers remain available for Windows, macOS, and Linux.
 
 ## Documentation
 
@@ -160,7 +164,9 @@ The GitHub source repository intentionally excludes the large runtime and execut
 
 CurvePress is not an AI image redrawer. It does not intentionally change the source aspect ratio, invent missing composition, or guarantee a successful physical print for every image. It simplifies geometry when details would be too small or fragile for the selected printer settings.
 
-STEP generation uses OpenCascade and may take several minutes for complex artwork. The CAD pipeline stops above 1,600 isolated regions to avoid enormous, fragile files. Always review warnings and inspect a preview before printing.
+CAD generation uses OpenCascade and may take several minutes for complex artwork. All CAD formats (STEP, 3MF and STL) share the same validated solid and stop above 1,600 isolated regions per layer. Lower detail or increase dot pitch for dense images. SVG and the analysis ZIP remain available before CAD export. Always review warnings and inspect a preview before printing.
+
+The plate size limit is 256 mm; an A1 mini has a 180 × 180 mm bed. Use a plate at most 170 × 170 mm to leave room for adhesion aids. The app warns when a plate exceeds 180 mm. Larger designs require a larger printer; automatic tiling is not implemented.
 
 ## Development
 
@@ -211,4 +217,5 @@ CurvePress Studio 可以把照片、扫描件、线稿和海报转换成适合FD
 ## License
 
 MIT License. See [LICENSE](LICENSE).
+
 
