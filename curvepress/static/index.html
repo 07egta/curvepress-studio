@@ -158,6 +158,146 @@
     $('#presets').addEventListener('click',event=>{if(event.target.closest('[data-style]')){invalidateResult();$('#analyze').disabled=!state.image;if(state.image)setStatus('ready','ok')}});
     applyLanguage(state.lang);
   </script>
+  <style>
+    #plate3d{position:absolute;inset:0;width:100%;height:100%;cursor:grab;touch-action:none;border-radius:20px}
+    #plate3d:active{cursor:grabbing}
+    .viewer{position:relative}
+    .layer-chips{position:absolute;left:12px;top:12px;display:flex;flex-wrap:wrap;gap:6px;z-index:2}
+    .layer-chips button{border:0;border-radius:99px;padding:6px 10px;font-size:11px;font-weight:650;background:rgba(29,29,31,.72);color:#f5f5f7;backdrop-filter:blur(8px);display:flex;align-items:center;gap:6px;cursor:pointer}
+    .layer-chips button.active{background:#f5f5f7;color:#1d1d1f}
+    .layer-chips i{width:10px;height:10px;border-radius:50%;display:inline-block;box-shadow:0 0 0 1px rgba(255,255,255,.5)}
+    .tab-new::after{content:'NEW';margin-left:5px;font-size:8px;letter-spacing:.06em;color:var(--blue);vertical-align:1px}
+  </style>
+  <script>
+  (()=>{
+    const add=(lang,obj)=>Object.assign(i18n[lang],obj);
+    add('en',{proofTab:'Pulled proof',plate3dTab:'3D plate',proofBadge:'SIMULATED PRINT ON WASHI · KENTO WIPED',plate3dBadge:'REAL PLATE (MIRRORED) · DRAG TO ROTATE',kento:'Add kento registration marks to colour plates',height1:'Height ×1',height3:'Height ×3',noWebgl:'3D preview needs WebGL 2.'});
+    add('ja',{proofTab:'刷り上がり',plate3dTab:'3D版',proofBadge:'和紙に刷ったシミュレーション · 見当は拭き取り',plate3dBadge:'実物の版（鏡像）· ドラッグで回転',kento:'多色版に見当（位置合わせマーク）を付ける',height1:'高さ ×1',height3:'高さ ×3',noWebgl:'3D表示にはWebGL 2が必要です。'});
+    add('zh',{proofTab:'印刷效果',plate3dTab:'3D 版',proofBadge:'和纸印刷模拟 · 规矩已擦净',plate3dBadge:'实际版面（镜像）· 拖动旋转',kento:'为多色版添加规矩（套准标记）',height1:'高度 ×1',height3:'高度 ×3',noWebgl:'3D 预览需要 WebGL 2。'});
+
+    // --- tabs -------------------------------------------------------------
+    const tabs=$('#tabs');
+    const mkTab=(view,key)=>{const b=document.createElement('button');b.className='tab hidden tab-new';b.dataset.view=view;b.dataset.i18n=key;b.type='button';b.addEventListener('click',()=>showView(view));tabs.append(b);return b};
+    const newTabs=[mkTab('proof','proofTab'),mkTab('plate3d','plate3dTab')];
+
+    // --- kento toggle -----------------------------------------------------
+    const adv=document.querySelector('aside details .advanced');
+    if(adv){const l=document.createElement('label');l.className='toggle';l.innerHTML='<input id="kento" type="checkbox" checked><span data-i18n="kento"></span>';const inv=$('#invert')?.closest('.toggle');(inv||adv.lastElementChild).after(l)}
+    const baseConfig=config;config=()=>({...baseConfig(),registration_marks:$('#kento')?$('#kento').checked:true});
+
+    // --- 3D viewer --------------------------------------------------------
+    const viewer=$('.viewer');
+    const canvas=document.createElement('canvas');canvas.id='plate3d';canvas.className='hidden';viewer.append(canvas);
+    const chips=document.createElement('div');chips.className='layer-chips hidden';viewer.append(chips);
+    let gl=null,prog=null,mesh=null,layers=[],layerIndex=0,exaggerate=3,metrics=null,raf=0;
+    const cam={theta:-0.55,phi:0.95,dist:1,auto:true};
+
+    const VS=`#version 300 es
+      in vec3 p;in vec3 n;uniform mat4 mvp;uniform float zs;uniform float top;out vec3 vn;out float h;out vec3 wp;
+      void main(){vec3 q=vec3(p.xy,p.z*zs);wp=q;vn=normalize(vec3(n.xy,n.z/zs));h=p.z/top;gl_Position=mvp*vec4(q,1.);}`;
+    const FS=`#version 300 es
+      precision highp float;in vec3 vn;in float h;in vec3 wp;uniform vec3 ink;uniform vec3 eye;uniform float baseFrac;out vec4 o;
+      void main(){vec3 N=normalize(vn);if(!gl_FrontFacing)N=-N;vec3 L=normalize(vec3(-.45,.55,.9));
+        float d=max(dot(N,L),0.);float hemi=.5+.5*N.z;vec3 V=normalize(eye-wp);float s=pow(max(dot(reflect(-L,N),V),0.),40.)*.35;
+        vec3 pla=vec3(.93,.92,.88);float t=smoothstep(baseFrac+.02,baseFrac+.25,h);vec3 c=mix(pla,ink,t*.85);
+        float layerLines=.97+.03*step(.5,fract(wp.z*5.));
+        o=vec4((c*(.28+.30*hemi+.62*d)+s)*layerLines,1.);}`;
+
+    function initGL(){
+      if(gl)return true;gl=canvas.getContext('webgl2',{antialias:true});if(!gl)return false;
+      const sh=(t,src)=>{const s=gl.createShader(t);gl.shaderSource(s,src);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(s));return s};
+      prog=gl.createProgram();gl.attachShader(prog,sh(gl.VERTEX_SHADER,VS));gl.attachShader(prog,sh(gl.FRAGMENT_SHADER,FS));gl.linkProgram(prog);
+      bindOrbit();return true}
+
+    function buildMesh(img){
+      const W=metrics.plate_mm[0],H=metrics.plate_mm[1],base=metrics.base_height_mm,relief=metrics.relief_height_mm;
+      const maxSide=440,sc=Math.min(1,maxSide/Math.max(img.width,img.height));
+      const nx=Math.max(8,Math.round(img.width*sc)),ny=Math.max(8,Math.round(img.height*sc));
+      const c=document.createElement('canvas');c.width=nx;c.height=ny;const cx=c.getContext('2d',{willReadFrequently:true});cx.drawImage(img,0,0,nx,ny);
+      const px=cx.getImageData(0,0,nx,ny).data;
+      // grid with a 1-cell skirt at z=0 to form the base's side walls
+      const gx=nx+2,gy=ny+2,pos=new Float32Array(gx*gy*3),nor=new Float32Array(gx*gy*3);
+      const zAt=(i,j)=>{if(i<=0||j<=0||i>=gx-1||j>=gy-1)return 0;const v=px[((j-1)*nx+(i-1))*4]/255;return base+relief*v};
+      const xAt=i=>Math.min(Math.max(i-1,0),nx-1)/(nx-1)*W, yAt=j=>H-Math.min(Math.max(j-1,0),ny-1)/(ny-1)*H;
+      for(let j=0;j<gy;j++)for(let i=0;i<gx;i++){const k=(j*gx+i)*3;pos[k]=xAt(i);pos[k+1]=yAt(j);pos[k+2]=zAt(i,j)}
+      for(let j=0;j<gy;j++)for(let i=0;i<gx;i++){const k=(j*gx+i)*3;
+        const l=Math.max(i-1,0),r=Math.min(i+1,gx-1),d=Math.max(j-1,0),u=Math.min(j+1,gy-1);
+        const dzx=(pos[(j*gx+r)*3+2]-pos[(j*gx+l)*3+2])/Math.max(1e-4,pos[(j*gx+r)*3]-pos[(j*gx+l)*3]);
+        const dzy=(pos[(u*gx+i)*3+2]-pos[(d*gx+i)*3+2])/Math.min(-1e-4,pos[(u*gx+i)*3+1]-pos[(d*gx+i)*3+1]);
+        let a=-dzx,b=dzy,cz=1;if(i===0)a=-1,b=0,cz=.15;if(i===gx-1)a=1,b=0,cz=.15;if(j===0)b=1,cz=.15;if(j===gy-1)b=-1,cz=.15;
+        const len=Math.hypot(a,b,cz);nor[k]=a/len;nor[k+1]=b/len;nor[k+2]=cz/len}
+      const idx=new Uint32Array((gx-1)*(gy-1)*6);let t=0;
+      for(let j=0;j<gy-1;j++)for(let i=0;i<gx-1;i++){const a=j*gx+i,b=a+1,c2=a+gx,d=c2+1;idx.set([a,c2,b,b,c2,d],t);t+=6}
+      if(mesh){gl.deleteVertexArray(mesh.vao);mesh.bufs.forEach(b=>gl.deleteBuffer(b))}
+      const vao=gl.createVertexArray();gl.bindVertexArray(vao);const bufs=[];
+      const attr=(name,data)=>{const b=gl.createBuffer();bufs.push(b);gl.bindBuffer(gl.ARRAY_BUFFER,b);gl.bufferData(gl.ARRAY_BUFFER,data,gl.STATIC_DRAW);const loc=gl.getAttribLocation(prog,name);gl.enableVertexAttribArray(loc);gl.vertexAttribPointer(loc,3,gl.FLOAT,false,0,0)};
+      attr('p',pos);attr('n',nor);const ib=gl.createBuffer();bufs.push(ib);gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,ib);gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,idx,gl.STATIC_DRAW);
+      mesh={vao,bufs,count:idx.length,W,H,top:base+relief,baseFrac:base/(base+relief)};cam.dist=Math.hypot(W,H)*1.75;cam.phi=.82;cam.theta=-1.25}
+
+    const hex=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16)/255);
+    function mat(){ // perspective * lookAt, column-major
+      const w=canvas.clientWidth,h=canvas.clientHeight,asp=w/Math.max(1,h),f=1/Math.tan(.5*.62),near=1,far=2000;
+      const P=[f/asp,0,0,0,0,f,0,0,0,0,(far+near)/(near-far),-1,0,0,2*far*near/(near-far),0];
+      const tx=mesh.W/2,ty=mesh.H/2,tz=0;const e=[tx+cam.dist*Math.sin(cam.phi)*Math.cos(cam.theta),ty+cam.dist*Math.sin(cam.phi)*Math.sin(cam.theta),tz+cam.dist*Math.cos(cam.phi)];
+      const sub=(a,b)=>a.map((v,i)=>v-b[i]),nrm=a=>{const l=Math.hypot(...a);return a.map(v=>v/l)},cr=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]],dt=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
+      const z=nrm(sub(e,[tx,ty,tz])),x=nrm(cr([0,0,1],z)),y=cr(z,x);
+      const V=[x[0],y[0],z[0],0,x[1],y[1],z[1],0,x[2],y[2],z[2],0,-dt(x,e),-dt(y,e),-dt(z,e),1];
+      const M=new Float32Array(16);for(let c=0;c<4;c++)for(let r=0;r<4;r++){let s=0;for(let k=0;k<4;k++)s+=P[k*4+r]*V[c*4+k];M[c*4+r]=s}return{M,e}}
+
+    function draw(){
+      raf=0;if(!mesh||canvas.classList.contains('hidden'))return;
+      const dpr=Math.min(2,devicePixelRatio||1),w=Math.round(canvas.clientWidth*dpr),h=Math.round(canvas.clientHeight*dpr);
+      if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h}
+      gl.viewport(0,0,w,h);gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);gl.enable(gl.DEPTH_TEST);
+      gl.useProgram(prog);const {M,e}=mat();const u=n=>gl.getUniformLocation(prog,n);
+      gl.uniformMatrix4fv(u('mvp'),false,M);gl.uniform1f(u('zs'),exaggerate);gl.uniform1f(u('top'),mesh.top);gl.uniform1f(u('baseFrac'),mesh.baseFrac);
+      const lay=layers[layerIndex];gl.uniform3fv(u('ink'),layers.length>1?hex(lay.color):[.93,.55,.16]);gl.uniform3fv(u('eye'),e);
+      gl.bindVertexArray(mesh.vao);gl.drawElements(gl.TRIANGLES,mesh.count,gl.UNSIGNED_INT,0);
+      if(cam.auto){cam.theta+=.0035;request()}}
+    const request=()=>{if(!raf)raf=requestAnimationFrame(draw)};
+
+    function bindOrbit(){
+      const pts=new Map();let pinch=0;
+      canvas.addEventListener('pointerdown',e=>{cam.auto=false;canvas.setPointerCapture(e.pointerId);pts.set(e.pointerId,[e.clientX,e.clientY])});
+      canvas.addEventListener('pointermove',e=>{if(!pts.has(e.pointerId))return;const [x0,y0]=pts.get(e.pointerId);pts.set(e.pointerId,[e.clientX,e.clientY]);
+        if(pts.size===1){cam.theta-=(e.clientX-x0)*.008;cam.phi=Math.min(1.45,Math.max(.05,cam.phi-(e.clientY-y0)*.008))}
+        else if(pts.size===2){const [a,b]=[...pts.values()],d=Math.hypot(a[0]-b[0],a[1]-b[1]);if(pinch)cam.dist=Math.min(900,Math.max(20,cam.dist*pinch/d));pinch=d}
+        request()});
+      const up=e=>{pts.delete(e.pointerId);pinch=0};canvas.addEventListener('pointerup',up);canvas.addEventListener('pointercancel',up);
+      canvas.addEventListener('wheel',e=>{e.preventDefault();cam.auto=false;cam.dist=Math.min(900,Math.max(20,cam.dist*Math.exp(e.deltaY*.0012)));request()},{passive:false});
+      new ResizeObserver(request).observe(canvas)}
+
+    function renderChips(){
+      chips.innerHTML='';
+      layers.forEach((l,i)=>{const b=document.createElement('button');b.type='button';b.className=i===layerIndex?'active':'';b.innerHTML=`<i style="background:${l.color}"></i>${l.name}`;b.onclick=()=>{layerIndex=i;load3d()};chips.append(b)});
+      const ex=document.createElement('button');ex.type='button';ex.textContent=t(exaggerate===1?'height3':'height1');ex.onclick=()=>{exaggerate=exaggerate===1?3:1;renderChips();request()};chips.append(ex)}
+
+    function load3d(){
+      if(!state.job||!layers.length)return;
+      const job=state.job,index=layerIndex;
+      if(!initGL()){setRawStatus(t('noWebgl'),'error');return}
+      const img=new Image();img.onload=()=>{if(state.job!==job||layerIndex!==index)return;buildMesh(img);renderChips();request()};img.src=layers[index].height}
+
+    // --- view switching ---------------------------------------------------
+    const baseShow=showView;
+    showView=name=>{
+      const is3d=name==='plate3d';
+      canvas.classList.toggle('hidden',!is3d);chips.classList.toggle('hidden',!is3d);
+      if(is3d){$$('#tabs .tab').forEach(x=>x.classList.toggle('active',x.dataset.view===name));$('#preview').classList.add('hidden');$('#empty').classList.add('hidden');
+        $('#viewBadge').classList.remove('hidden');$('#viewBadge').textContent=t('plate3dBadge');load3d();return}
+      baseShow(name);
+      if(name==='proof'&&state.views.proof){$('#viewBadge').classList.remove('hidden');$('#viewBadge').textContent=t('proofBadge')}};
+
+    const baseRender=renderResult;
+    renderResult=data=>{layers=data.layers||[];layerIndex=0;metrics=data.metrics;mesh=null;cam.auto=true;newTabs.forEach(b=>b.classList.remove('hidden'));const r=baseRender(data);
+      $('#downloads').insertAdjacentHTML('beforeend',`<a class="download" href="${data.previews.proof}" download="proof-preview.png">↧ proof-preview.png</a>`);return r};
+    const baseInvalidate=invalidateResult;
+    invalidateResult=()=>{layers=[];metrics=null;layerIndex=0;if(raf)cancelAnimationFrame(raf);raf=0;if(mesh&&gl){gl.deleteVertexArray(mesh.vao);mesh.bufs.forEach(b=>gl.deleteBuffer(b))}mesh=null;newTabs.forEach(b=>b.classList.add('hidden'));canvas.classList.add('hidden');chips.classList.add('hidden');return baseInvalidate()};
+    const baseSelect=selectFile;
+    selectFile=async file=>{newTabs.forEach(b=>b.classList.add('hidden'));canvas.classList.add('hidden');chips.classList.add('hidden');return baseSelect(file)};
+    applyLanguage(state.lang);
+  })();
+  </script>
 </body>
 </html>
 

@@ -18,3 +18,4 @@ The Web UI's **Hokusai sample** button loads the same local file, so you can pre
 
 Image regression testing uses the same artwork with the Woodcut preset and reload-checks a 139 × 83 × 2.0 mm STEP with 48 regions and 230 holes. The expected result is one solid, matching dimensions, zero mesh boundary edges, and zero non-manifold edges.
 
+

@@ -48,6 +48,7 @@ def _analysis_payload(result: AnalysisResult) -> dict:
             "corrected": _artifact_url(result.job_id, "corrected.png"),
             "print": _artifact_url(result.job_id, "print-preview.png"),
             "curves": _artifact_url(result.job_id, "curve-preview.png"),
+            "proof": _artifact_url(result.job_id, "proof-preview.png"),
         },
         "layers": [
             {
@@ -55,6 +56,7 @@ def _analysis_payload(result: AnalysisResult) -> dict:
                 "color": layer.color_hex,
                 "mask": _artifact_url(result.job_id, f"{layer.name}-mask.png"),
                 "svg": _artifact_url(result.job_id, f"{layer.name}.svg"),
+                "height": _artifact_url(result.job_id, f"{layer.name}-height.png"),
             }
             for layer in result.layers
         ],

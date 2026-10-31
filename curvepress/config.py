@@ -33,7 +33,14 @@ class PlateConfig:
     halftone_pitch_mm: float = 1.70
     halftone_min_dot_mm: float = 0.50
     halftone_max_dot_mm: float = 1.60
+    registration_marks: bool = True
+    registration_band_mm: float = 6.0
+    proof_seed: int = 7
     title: str = "curvepress_plate"
+
+    def uses_registration(self) -> bool:
+        """Kento marks are only meaningful when several plates must line up."""
+        return self.style == "color_layers" and self.registration_marks
 
     @staticmethod
     def _layer_round(value: float, layer: float) -> float:
@@ -45,7 +52,7 @@ class PlateConfig:
             "base_height_mm", "relief_height_mm", "edge_margin_mm", "minimum_width_mm",
             "minimum_gap_mm", "minimum_component_mm2", "curve_tolerance_mm",
         }
-        flags = {"invert", "mirror_for_print", "remove_scan_frame"}
+        flags = {"invert", "mirror_for_print", "remove_scan_frame", "registration_marks"}
         for field in fields(self):
             key, value = field.name, data[field.name]
             if key in {"title", "style"}:
@@ -107,6 +114,12 @@ class PlateConfig:
             raise ValueError("edge margin leaves less than 2 mm of artwork space")
         if data["halftone_min_dot_mm"] > min(data["halftone_max_dot_mm"], data["halftone_pitch_mm"] * 0.96):
             raise ValueError("halftone minimum dot must fit within the maximum dot and pitch")
+        data["proof_seed"] = int(data["proof_seed"])
+        if not 0 <= data["proof_seed"] < 2**32:
+            raise ValueError("proof_seed must be between 0 and 2**32-1")
+        data["registration_band_mm"] = max(4.0, min(14.0, data["registration_band_mm"]))
+        if data["style"] == "color_layers" and data["registration_marks"] and 2 * data["edge_margin_mm"] + data["registration_band_mm"] >= data["height_mm"] - 2:
+            raise ValueError("registration band leaves less than 2 mm of artwork space")
         data["title"] = "".join(c if c.isalnum() or c in "-_" else "_" for c in data["title"])[:80] or "curvepress_plate"
         return PlateConfig(**data)
 

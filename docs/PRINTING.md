@@ -34,3 +34,4 @@ The default plate is 0.8 mm base, 1.2 mm relief, and 2.0 mm total height. If a p
 
 For use with food, skin, or fabric, verify the safety of the chosen material and ink separately.
 
+

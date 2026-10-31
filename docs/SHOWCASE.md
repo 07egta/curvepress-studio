@@ -66,3 +66,4 @@ This sequence shows the visual transformation and the practical printability che
 - A successful export is not a guarantee of a successful physical stamp or print.
 - Always read warnings and make a small test print first.
 
+

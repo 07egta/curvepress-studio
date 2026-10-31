@@ -180,3 +180,4 @@ def curve_counts(regions: list[CurveRegion]) -> dict[str, int]:
         "bezier_segments": int(sum(len(cubic_segments(path)) for path in paths)),
     }
 
+
