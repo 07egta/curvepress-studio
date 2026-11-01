@@ -108,16 +108,20 @@ def analyze_image(
         make_heightmap(layer, config).save(directory / f"{layer.name}-height.png", compress_level=1)
 
     total_segments = sum(item["bezier_segments"] for item in all_metrics)
-    warnings = []
+    # ``notes`` are machine-readable (the UI translates them); ``warnings``
+    # keeps the English sentences for the CLI and the JSON report.
+    notes: list[dict] = []
     if max(config.width_mm, config.height_mm) > 180:
-        warnings.append("Plate exceeds the A1 mini 180 × 180 mm bed; use a larger printer or reduce the size.")
+        notes.append({"code": "bed_a1mini", "text": "Plate exceeds the A1 mini 180 × 180 mm bed; use a larger printer or reduce the size."})
     for item in all_metrics:
+        name = item["name"]
         if item["regions"] > 1600:
-            warnings.append(f"{item['name']}: {item['regions']} regions exceed the CAD limit of 1,600; increase dot spacing or lower detail before export. SVG is available.")
+            notes.append({"code": "step_skipped", "layer": name, "n": item["regions"], "text": f"{name}: {item['regions']} regions exceed the STEP limit of 1,600; 3MF/STL/SVG are fine. Increase dot spacing or lower detail if you need STEP."})
         if item["fragile_fraction"] > 0.22:
-            warnings.append(f"{item['name']}: fine-detail risk is high; use Arachne or lower detail")
+            notes.append({"code": "fragile", "layer": name, "text": f"{name}: fine-detail risk is high; use Arachne or lower detail"})
         if item["fill_ratio"] > 0.72:
-            warnings.append(f"{item['name']}: ink coverage is high; roll a very thin film")
+            notes.append({"code": "heavy_ink", "layer": name, "text": f"{name}: ink coverage is high; roll a very thin film"})
+    warnings = [note["text"] for note in notes]
     metrics = {
         "job_id": job_id,
         "plate_mm": [config.width_mm, config.height_mm],
@@ -126,6 +130,7 @@ def analyze_image(
         "total_height_mm": config.base_height_mm + config.relief_height_mm,
         "mirrored_for_print": config.mirror_for_print,
         "registration_marks": config.uses_registration(),
+        "notes": notes,
         "layers": all_metrics,
         "total_bezier_segments": total_segments,
         "auto_settings": config.public_dict(),

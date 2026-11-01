@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "curvepress-studio"
-version = "0.2.0"
+version = "0.3.0"
 description = "Images to curve-based, physically printable relief plates"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -23,6 +23,7 @@ dependencies = [
   "scipy>=1.11,<2",
   "Pillow>=10.2,<13",
   "contourpy>=1.2,<2",
+  "mapbox_earcut>=1.0,<3",
 ]
 
 [project.optional-dependencies]

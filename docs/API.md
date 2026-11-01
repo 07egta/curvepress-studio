@@ -4,6 +4,9 @@ The CurvePress Studio API is intended for local use on `127.0.0.1`. It does not 
 
 ## `POST /api/analyze`
 
+Send `image` (data URL) or, to re-tune without re-uploading, the `image_id` returned by a previous call. An unknown `image_id` returns 409 `image_expired`; resend the image. The response also carries `metrics.notes` (`code`, `layer`, `n`) for translated warnings.
+
+
 ```json
 {
   "image": "data:image/png;base64,...",
@@ -28,7 +31,7 @@ Use Content-Type: application/json. Returns preview URLs, per-plate SVG files, a
 {"job_id": "returned-job-id"}
 ```
 
-Queues background generation of STEP/3MF/STL files and validation JSON. Repeated requests for a queued, running, or completed job reuse that export. CAD work is serialized; files appear only after the complete set passes validation.
+Queues background generation of STEP (plus refreshed 3MF/STL) and validation JSON. 3MF/STL for every plate are already available from `/api/analyze` (`layers[].stl`, `layers[].3mf`). Repeated requests for a queued, running, or completed job reuse that export. CAD work is serialized; files appear only after the complete set passes validation.
 
 ## `GET /api/export/{job_id}`
 

@@ -12,7 +12,8 @@ CurvePress does not try to redraw an image artistically. It preserves the source
 6. Convert the contour to a self-intersection-resistant cubic Bézier sequence with rounded corners inside local triangles.
 7. Write SVG and convert the same curves into exact cubic B-spline edges before extruding with OpenCascade.
 8. Fuse the base and raised faces, write STEP, and reload it.
-9. Check BRep validity, solid count, physical dimensions, STL boundaries, and non-manifold edges.
+9. Mesh 3MF/STL directly from the same Bézier chain (earcut floors and tops, vertical walls, shared vertices) and check boundaries, non-manifold edges and dimensions.
+10. For STEP, turn each loop into one exact C1 B-spline, glue the extruded regions onto the base, write, read back, and check BRep validity, solid count and dimensions.
 
 ## Referenced research and implementations
 

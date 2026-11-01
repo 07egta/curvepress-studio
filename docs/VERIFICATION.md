@@ -10,7 +10,7 @@ python -m pytest
 python -m ruff check curvepress tests launcher/desktop.py scripts
 ```
 
-The suite checks every style with a real STEP write/read cycle and STL/3MF generation, including a hole in a raised region. It checks one connected CAD solid, closed mesh edges, non-manifold edges, output dimensions and file existence. HTTP tests exercise analysis ZIP downloads, malformed requests, path traversal, and 12 concurrent requests for the same export (one CAD worker).
+The suite checks every style with a real STEP write/read cycle and direct STL/3MF meshing (closed, exact size, volume equal to the curve area within 0.2 %), including a hole in a raised region. It checks one connected CAD solid, closed mesh edges, non-manifold edges, output dimensions and file existence. HTTP tests exercise analysis ZIP downloads, malformed requests, path traversal, and 12 concurrent requests for the same export (one CAD worker).
 
 ## Browser checks
 
@@ -33,4 +33,4 @@ CI tests base Python behavior on Windows, macOS and Linux with Python 3.11 and 3
 
 ## Remaining physical and platform verification
 
-Physical ink transfer, paper/ink choice, adhesion, dimensional accuracy after printing, and the unsigned Windows app's behavior on the user's own PC must be checked on that hardware. Automatic tiling is not implemented. The shared CAD pipeline has a 1,600-region-per-layer limit; increase halftone spacing or reduce detail for dense images.
+Physical ink transfer, paper/ink choice, adhesion, dimensional accuracy after printing, and the unsigned Windows app's behavior on the user's own PC must be checked on that hardware. Automatic tiling is not implemented. STEP has a 1,600-region-per-layer limit (3MF/STL do not); increase halftone spacing or reduce detail if STEP is needed for dense images.

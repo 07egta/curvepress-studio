@@ -4,6 +4,24 @@ All notable changes to CurvePress Studio are documented here.
 
 CurvePress is in beta. Version notes describe the repository state and may not represent a packaged release.
 
+## 0.3.0 — 2026-11-01
+
+### English
+
+- **CAD export ~24× faster**: each contour is one exact C1 B-spline (same poles as the SVG Bézier chain) and reliefs are glued onto the base instead of a general boolean. Great Wave woodcut: 430 s → 18 s.
+- **3MF/STL meshed directly** from the curves in well under a second: closed, 2-manifold, exact size; available immediately after analysis. Dense halftones (>1,600 dots) now export 3MF/STL; only STEP is skipped.
+- Vectorised Bézier chain, sampling, RDP, STL reading and mesh checks (halftone analysis 6 s → 2.4 s).
+- Server renders the proof, meshes and ZIP in the background, and re-analysis reuses the uploaded image (`image_id`).
+- New interface: automatic updates (no Analyze button), paste support, peel-to-compare original vs. print, 3D plate, pinned Save panel, translated warnings, dark mode, phone layout.
+
+### 日本語
+
+- **CAD書き出しが約24倍速く**：輪郭ごとに1本の正確なC1 Bスプライン（SVGと同じ制御点）にし、凸部を土台に「貼り合わせ」る方式に。北斎の木版画で430秒 → 18秒。
+- **3MF/STLを曲線から直接作成**（1秒未満・穴なし・寸法ぴったり）。解析直後から保存可能。1,600点を超える網点も3MF/STLは出せる（STEPのみ省略）。
+- 曲線計算をまとめて処理し高速化（網点の解析 6秒 → 2.4秒）。
+- 刷り上がり・メッシュ・ZIPを裏で作成。設定変更時は画像を送り直さない。
+- 新しい画面：自動更新（解析ボタンなし）、貼り付け対応、めくって見比べ、3D版、固定の保存欄、警告の翻訳、ダークモード、スマホ対応。
+
 ## 0.2.0 — 2026-10-31
 
 ### Reliability and distribution

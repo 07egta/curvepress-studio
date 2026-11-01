@@ -46,6 +46,14 @@ flowchart LR
     E --> F[Print & test]
 ```
 
+## New in 0.3 — faster, simpler
+
+- **CAD export ~24× faster** (Great Wave woodcut: 7 min → 18 s) and **3MF/STL instantly**, meshed straight from the curves.
+- **No Analyze button**: drop or paste an image and the plate follows every change you make.
+- **Compare by peeling**: drag across the table to see the original turn into the pulled print.
+- A redesigned, trilingual studio with a dark mode and a phone layout.
+- Dense halftones can now be saved as 3MF/STL (only STEP has the 1,600-region limit).
+
 ## New in 0.2 — from plate to paper
 
 - **Pulled proof** — see the print on washi paper before you print anything: ink mottling from the baren, edge pooling, paper fibres, and a little colour drift between plates.
@@ -70,7 +78,7 @@ flowchart LR
 
 ## Quick start
 
-Python 3.11 or newer is required. The CAD extra enables STEP, 3MF, and STL export.
+Python 3.11 or newer is required. 3MF, STL and SVG work out of the box; the CAD extra adds STEP export.
 
 ```bash
 git clone https://github.com/07egta/curvepress-studio.git
@@ -94,7 +102,7 @@ pip install -e '.[cad]'
 curvepress serve
 ```
 
-Open <http://127.0.0.1:8765>, choose an image, select a style, click **Analyze image → curves**, and export the result.
+Open <http://127.0.0.1:8765> and choose an image (or paste one). The plate updates by itself as you change the style or size; save 3MF/STL/SVG right away, and click **Also make STEP** only if you need CAD.
 
 For a source checkout without the CAD dependency, use `pip install -e .` and add `--svg-only` to a CLI conversion.
 
@@ -173,7 +181,7 @@ The app opens the local browser UI and saves generated files under `%LOCALAPPDAT
 
 CurvePress is not an AI image redrawer. It does not intentionally change the source aspect ratio, invent missing composition, or guarantee a successful physical print for every image. It simplifies geometry when details would be too small or fragile for the selected printer settings.
 
-CAD generation uses OpenCascade and may take several minutes for complex artwork. All CAD formats (STEP, 3MF and STL) share the same validated solid and stop above 1,600 isolated regions per layer. Lower detail or increase dot pitch for dense images. SVG and the analysis ZIP remain available before CAD export. Always review warnings and inspect a preview before printing.
+3MF and STL are meshed directly from the same Bézier curves as the SVG (closed and 2-manifold, checked every time) and are ready as soon as the preview is. STEP uses OpenCascade: each contour is one exact C1 B-spline and the reliefs are glued onto the base, which takes seconds to tens of seconds; it is read back and validated, and is skipped above 1,600 isolated regions per layer (3MF/STL still work). Always review warnings and inspect a preview before printing.
 
 The plate size limit is 256 mm; an A1 mini has a 180 × 180 mm bed. Use a plate at most 170 × 170 mm to leave room for adhesion aids. The app warns when a plate exceeds 180 mm. Larger designs require a larger printer; automatic tiling is not implemented.
 
@@ -195,6 +203,14 @@ CurvePress Studioは、写真・スキャン・ロゴ・線画を、FDM方式の
 
 画像は自分のPC上で処理され、クラウドの画像サービスへ送信されません。
 
+### 0.3の新機能 — 速く、かんたんに
+
+- **CAD書き出しが約24倍速く**（北斎・木版画：7分 → 18秒）。**3MF/STLは一瞬**で保存できる
+- **解析ボタンなし**：画像を置く（貼り付けもOK）だけで、設定を変えるたびに自動で版が更新
+- **めくって見比べ**：境目をドラッグすると、原画が刷り上がりに変わる
+- 3か国語・ダークモード・スマホ対応の新しい画面
+- 細かい網点も3MF/STLで保存可能に（1,600個の制限はSTEPだけ）
+
 ### 0.2の新機能 — 版から紙へ
 
 - **刷り上がり** — 印刷する前に、和紙に刷ったときの見た目を確認（バレンのムラ・縁のインク溜まり・紙の繊維・色ごとの小さなズレ）
@@ -214,7 +230,7 @@ CurvePress Studioは、写真・スキャン・ロゴ・線画を、FDM方式の
 
 ### 最短で試す
 
-Python 3.11以上を用意し、上の **Quick start** の手順で起動してください。ブラウザーで <http://127.0.0.1:8765> を開き、画像を選択してスタイルを選び、**Analyze image → curves** を押します。
+Python 3.11以上を用意し、上の **Quick start** の手順で起動してください。ブラウザーで <http://127.0.0.1:8765> を開き、画像を選ぶ（貼り付けでもOK）だけ。スタイルやサイズを変えると自動で版が更新されます。3MF/STL/SVGはすぐ保存でき、CAD用のSTEPはボタンで作れます。
 
 詳しい印刷条件は[印刷ガイド](docs/PRINTING.md)、処理の考え方は[アルゴリズムの説明](docs/ALGORITHM.md)を参照してください。
 
