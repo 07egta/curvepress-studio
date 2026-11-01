@@ -48,6 +48,8 @@ flowchart LR
 
 ## New in 0.3 — faster, simpler
 
+<p align="center"><img src="docs/images/studio.jpg" width="92%" alt="CurvePress Studio: style choices on the left, original and pulled print compared on the printing table"></p>
+
 - **CAD export ~24× faster** (Great Wave woodcut: 7 min → 18 s) and **3MF/STL instantly**, meshed straight from the curves.
 - **No Analyze button**: drop or paste an image and the plate follows every change you make.
 - **Compare by peeling**: drag across the table to see the original turn into the pulled print.
