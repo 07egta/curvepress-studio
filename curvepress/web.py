@@ -8,16 +8,18 @@ import traceback
 import webbrowser
 import zipfile
 import importlib.util
+import hashlib
 import uuid
+from collections import OrderedDict
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
 from . import __version__
 from .config import PlateConfig
-from .exporter import export_analysis
+from .exporter import export_analysis, export_meshes
 from .models import AnalysisResult
-from .pipeline import analyze_image
+from .pipeline import analyze_image, write_proof
 
 
 STATIC_ROOT = Path(__file__).with_name("static")
@@ -26,6 +28,12 @@ EXPORTS: dict[str, dict] = {}
 LOCK = threading.Lock()
 CAD_LOCK = threading.Lock()
 MAX_JOBS = 12
+# Recently uploaded images, so re-tuning a style does not resend megabytes.
+IMAGES: "OrderedDict[str, bytes]" = OrderedDict()
+MAX_IMAGES = 6
+# Set when a job's deferred proof + ZIP bundle are on disk.
+FINISHED: dict[str, threading.Event] = {}
+SLOW_ARTIFACTS = {"proof-preview.png"}
 OUTPUT_ROOT = Path("curvepress-output").resolve()
 
 
@@ -35,6 +43,10 @@ def _json_bytes(value: object) -> bytes:
 
 def _artifact_url(job_id: str, name: str) -> str:
     return f"/api/artifact/{job_id}/{name}"
+
+
+def _title(result: AnalysisResult) -> str:
+    return str(result.metrics.get("auto_settings", {}).get("title") or "curvepress_plate")
 
 
 def _analysis_payload(result: AnalysisResult) -> dict:
@@ -57,6 +69,8 @@ def _analysis_payload(result: AnalysisResult) -> dict:
                 "mask": _artifact_url(result.job_id, f"{layer.name}-mask.png"),
                 "svg": _artifact_url(result.job_id, f"{layer.name}.svg"),
                 "height": _artifact_url(result.job_id, f"{layer.name}-height.png"),
+                "stl": _artifact_url(result.job_id, f"{_title(result)}_{layer.name}.stl"),
+                "3mf": _artifact_url(result.job_id, f"{_title(result)}_{layer.name}.3mf"),
             }
             for layer in result.layers
         ],
@@ -80,6 +94,30 @@ def _bundle(result: AnalysisResult) -> Path:
     return path
 
 
+def _finish_job(result: AnalysisResult, config: PlateConfig, done: threading.Event) -> None:
+    try:
+        try:
+            export_meshes(result, config)
+        except Exception:
+            traceback.print_exc()
+        write_proof(result.layers, config, result.directory)
+        _bundle(result)
+    except Exception:  # a missing proof must never break the plate itself
+        traceback.print_exc()
+    finally:
+        done.set()
+
+
+def _remember_image(data: bytes) -> str:
+    image_id = hashlib.sha256(data).hexdigest()[:24]
+    with LOCK:
+        IMAGES[image_id] = data
+        IMAGES.move_to_end(image_id)
+        while len(IMAGES) > MAX_IMAGES:
+            IMAGES.popitem(last=False)
+    return image_id
+
+
 def _run_export(job_id: str, config: PlateConfig) -> None:
     try:
         with CAD_LOCK:
@@ -87,6 +125,10 @@ def _run_export(job_id: str, config: PlateConfig) -> None:
                 result = JOBS[job_id]
                 EXPORTS[job_id] = {"state": "running", "message": "Building CAD solids…"}
             reports = export_analysis(result, config)
+        with LOCK:
+            done = FINISHED.get(job_id)
+        if done is not None:
+            done.wait(timeout=120)  # include the proof in the final ZIP
         bundle = _bundle(result)
         files = []
         for report in reports:
@@ -164,6 +206,11 @@ class CurvePressHandler(BaseHTTPRequestHandler):
             if result is None or Path(name).name != name:
                 self._json(404, {"error": "artifact not found"})
                 return
+            if name in SLOW_ARTIFACTS or name.endswith((".zip", ".stl", ".3mf")):
+                with LOCK:
+                    done = FINISHED.get(job_id)
+                if done is not None:
+                    done.wait(timeout=120)
             file_path = result.directory / name
             if not file_path.is_file():
                 self._json(404, {"error": "artifact not found"})
@@ -186,16 +233,23 @@ class CurvePressHandler(BaseHTTPRequestHandler):
         try:
             payload = self._read_json()
             if path == "/api/analyze":
-                data_url = str(payload.get("image", ""))
-                if "," not in data_url:
-                    raise ValueError("image data URL is missing")
-                header, encoded = data_url.split(",", 1)
-                if ";base64" not in header:
-                    raise ValueError("image must use base64 data URL encoding")
-                image_data = base64.b64decode(encoded, validate=True)
+                image_id = str(payload.get("image_id", ""))
+                with LOCK:
+                    image_data = IMAGES.get(image_id) if image_id else None
+                if image_data is None:
+                    data_url = str(payload.get("image", ""))
+                    if "," not in data_url:
+                        if image_id:
+                            raise LookupError("image_expired")
+                        raise ValueError("image data URL is missing")
+                    header, encoded = data_url.split(",", 1)
+                    if ";base64" not in header:
+                        raise ValueError("image must use base64 data URL encoding")
+                    image_data = base64.b64decode(encoded, validate=True)
+                image_id = _remember_image(image_data)
                 config = PlateConfig.from_dict(payload.get("config", {}))
-                result = analyze_image(image_data, config, OUTPUT_ROOT / "jobs")
-                _bundle(result)
+                result = analyze_image(image_data, config, OUTPUT_ROOT / "jobs", defer_proof=True)
+                done = threading.Event()
                 with LOCK:
                     while len(JOBS) >= MAX_JOBS:
                         expired = next((key for key in JOBS if EXPORTS.get(key, {}).get("state") not in {"queued", "running"}), None)
@@ -203,9 +257,12 @@ class CurvePressHandler(BaseHTTPRequestHandler):
                             raise ValueError("Too many exports are active; wait for an export to finish")
                         JOBS.pop(expired)
                         EXPORTS.pop(expired, None)
+                        FINISHED.pop(expired, None)
                     JOBS[result.job_id] = result
                     EXPORTS[result.job_id] = {"state": "idle"}
-                self._json(200, _analysis_payload(result))
+                    FINISHED[result.job_id] = done
+                threading.Thread(target=_finish_job, args=(result, config, done), daemon=True).start()
+                self._json(200, {**_analysis_payload(result), "image_id": image_id})
                 return
             if path == "/api/export":
                 job_id = str(payload.get("job_id", ""))
@@ -229,6 +286,8 @@ class CurvePressHandler(BaseHTTPRequestHandler):
                 self._json(202, {"state": "queued"})
                 return
             self._json(404, {"error": "not found"})
+        except LookupError as exc:
+            self._json(409, {"error": str(exc)})
         except Exception as exc:
             self._json(400, {"error": str(exc)})
 

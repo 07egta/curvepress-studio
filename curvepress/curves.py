@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from html import escape
 
 import contourpy
@@ -16,25 +17,33 @@ def signed_area(points: np.ndarray) -> float:
 
 
 def _distance_to_line(points: np.ndarray, start: np.ndarray, end: np.ndarray) -> np.ndarray:
-    delta = end - start
-    length = float(np.linalg.norm(delta))
+    dx, dy = float(end[0] - start[0]), float(end[1] - start[1])
+    length = math.hypot(dx, dy)
     if length < 1e-12:
-        return np.linalg.norm(points - start, axis=1)
-    return np.abs(delta[0] * (start[1] - points[:, 1]) - (start[0] - points[:, 0]) * delta[1]) / length
+        return np.hypot(points[:, 0] - start[0], points[:, 1] - start[1])
+    return np.abs(dx * (start[1] - points[:, 1]) - (start[0] - points[:, 0]) * dy) / length
 
 
 def rdp(points: np.ndarray, tolerance: float) -> np.ndarray:
-    if len(points) <= 2:
+    """Ramer-Douglas-Peucker with an explicit stack (same result as recursion)."""
+    count = len(points)
+    if count <= 2:
         return points
-    distances = _distance_to_line(points[1:-1], points[0], points[-1])
-    if not len(distances):
-        return points[[0, -1]]
-    index = int(np.argmax(distances)) + 1
-    if distances[index - 1] <= tolerance:
-        return points[[0, -1]]
-    left = rdp(points[: index + 1], tolerance)
-    right = rdp(points[index:], tolerance)
-    return np.vstack((left[:-1], right))
+    keep = np.zeros(count, dtype=bool)
+    keep[0] = keep[-1] = True
+    stack = [(0, count - 1)]
+    while stack:
+        first, last = stack.pop()
+        if last - first < 2:
+            continue
+        distances = _distance_to_line(points[first + 1 : last], points[first], points[last])
+        index = int(np.argmax(distances))
+        if distances[index] > tolerance:
+            split = first + 1 + index
+            keep[split] = True
+            stack.append((first, split))
+            stack.append((split, last))
+    return points[keep]
 
 
 def simplify_closed(points: np.ndarray, tolerance: float) -> np.ndarray | None:
@@ -82,9 +91,7 @@ def contour_regions(mask: np.ndarray, config: PlateConfig) -> list[CurveRegion]:
     return regions
 
 
-def cubic_segments(
-    points: np.ndarray, corner_fraction: float = 0.24
-) -> list[tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]]:
+def cubic_segments(points: np.ndarray, corner_fraction: float = 0.24) -> np.ndarray:
     """Return a closed, shape-preserving chain of cubic Bezier segments.
 
     A free Catmull-Rom conversion can overshoot a traced boundary and create a
@@ -95,54 +102,70 @@ def cubic_segments(
     cubic form; the joins are cubic collinear segments.  This keeps every
     control polygon local, is C1-continuous at the joins, and gives SVG and STEP
     the same four-pole representation.
+
+    Returns an ``(n, 4, 2)`` array; iterating it yields ``(p0, c1, c2, p3)``.
     """
     pts = np.asarray(points, dtype=np.float64)
     if len(pts) < 3:
-        return []
+        return np.empty((0, 4, 2))
     # Contour extraction can occasionally leave duplicate neighbours.  CAD
     # kernels reject the resulting zero-length edge, so remove them here.
     keep = np.linalg.norm(pts - np.roll(pts, 1, axis=0), axis=1) > 1e-9
     pts = pts[keep]
     if len(pts) < 3:
-        return []
+        return np.empty((0, 4, 2))
     fraction = float(np.clip(corner_fraction, 0.05, 0.45))
-    starts = np.empty_like(pts)
-    ends = np.empty_like(pts)
-    for index, point in enumerate(pts):
-        starts[index] = point + fraction * (pts[index - 1] - point)
-        ends[index] = point + fraction * (pts[(index + 1) % len(pts)] - point)
+    previous = np.roll(pts, 1, axis=0)
+    following = np.roll(pts, -1, axis=0)
+    starts = pts + fraction * (previous - pts)
+    ends = pts + fraction * (following - pts)
 
-    segments: list[tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]] = []
-    for index, point in enumerate(pts):
-        line_start = ends[index - 1]
-        line_end = starts[index]
-        if np.linalg.norm(line_end - line_start) > 1e-9:
-            delta = line_end - line_start
-            segments.append(
-                (line_start, line_start + delta / 3.0, line_start + 2.0 * delta / 3.0, line_end)
-            )
-        curve_start = starts[index]
-        curve_end = ends[index]
-        # Exact degree elevation of quadratic (start, point, end) to cubic.
-        segments.append(
-            (
-                curve_start,
-                curve_start + (point - curve_start) * (2.0 / 3.0),
-                curve_end + (point - curve_end) * (2.0 / 3.0),
-                curve_end,
-            )
-        )
-    return segments
+    # Straight join from the previous corner's end to this corner's start.
+    line_start = np.roll(ends, 1, axis=0)
+    line_end = starts
+    delta = line_end - line_start
+    has_line = np.hypot(delta[:, 0], delta[:, 1]) > 1e-9
+    lines = np.stack(
+        (line_start, line_start + delta / 3.0, line_start + 2.0 * delta / 3.0, line_end), axis=1
+    )
+    # Rounded corner: exact degree elevation of quadratic (start, point, end).
+    corners = np.stack(
+        (starts, starts + (pts - starts) * (2.0 / 3.0), ends + (pts - ends) * (2.0 / 3.0), ends), axis=1
+    )
+    # Interleave [line_i?, corner_i] in order.
+    merged = np.empty((len(pts) * 2, 4, 2), dtype=np.float64)
+    merged[0::2] = lines
+    merged[1::2] = corners
+    order = np.ones(len(pts) * 2, dtype=bool)
+    order[0::2] = has_line
+    return merged[order]
+
+
+def sample_segments(segments: np.ndarray, steps: int = 8) -> np.ndarray:
+    """Points along a cubic chain, vectorised (no per-segment Python loop)."""
+    segments = np.asarray(segments, dtype=np.float64)
+    if not len(segments):
+        return np.empty((0, 2))
+    t = np.linspace(0.0, 1.0, steps + 1)[:-1]
+    u = 1.0 - t
+    basis = np.stack((u**3, 3 * u * u * t, 3 * u * t * t, t**3), axis=1)  # (steps, 4)
+    return np.einsum("sk,nkd->nsd", basis, segments).reshape(-1, 2)
+
+
+def _fmt(values: np.ndarray) -> list[str]:
+    return [f"{v:.4f}" for v in values.ravel().tolist()]
 
 
 def path_d(points: np.ndarray) -> str:
     segments = cubic_segments(points)
-    first = segments[0][0]
-    commands = [f"M {first[0]:.4f} {first[1]:.4f}"]
-    for _, c1, c2, end in segments:
-        commands.append(
-            f"C {c1[0]:.4f} {c1[1]:.4f} {c2[0]:.4f} {c2[1]:.4f} {end[0]:.4f} {end[1]:.4f}"
-        )
+    if not len(segments):
+        return ""
+    first = _fmt(segments[0, 0])
+    controls = _fmt(segments[:, 1:, :])
+    commands = [f"M {first[0]} {first[1]}"]
+    for index in range(len(segments)):
+        c = controls[index * 6 : index * 6 + 6]
+        commands.append(f"C {c[0]} {c[1]} {c[2]} {c[3]} {c[4]} {c[5]}")
     commands.append("Z")
     return " ".join(commands)
 

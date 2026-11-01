@@ -103,3 +103,34 @@ class WebTests(unittest.TestCase):
                 self.assertEqual(len(calls), 1)
         finally:
             release.set()
+
+    def test_reanalyze_by_image_id_and_deferred_proof(self):
+        first = self.analyze()
+        image_id = first["image_id"]
+        status, body = self.request('/api/analyze', {
+            'image_id': image_id,
+            'config': {'width_mm': 30, 'height_mm': 24, 'style': 'woodcut'},
+        })
+        self.assertEqual(status, 200, body)
+        second = json.loads(body)
+        self.assertEqual(second["image_id"], image_id)
+        status, proof = self.request(second["previews"]["proof"])
+        self.assertEqual(status, 200)
+        self.assertTrue(proof.startswith(b"\x89PNG"))
+        status, archive = self.request(second["bundle"])
+        self.assertEqual(status, 200)
+        self.assertIn("proof-preview.png", zipfile.ZipFile(io.BytesIO(archive)).namelist())
+
+    def test_meshes_are_ready_without_cad_export(self):
+        result = self.analyze()
+        layer = result["layers"][0]
+        for key in ("stl", "3mf"):
+            status, body = self.request(layer[key])
+            self.assertEqual(status, 200, key)
+            self.assertGreater(len(body), 200)
+
+    def test_unknown_image_id_asks_for_upload(self):
+        status, body = self.request('/api/analyze', {'image_id': 'nope', 'config': {'style': 'poster'}})
+        self.assertEqual(status, 409)
+        self.assertIn("image_expired", body.decode())
+

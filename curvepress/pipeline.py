@@ -9,7 +9,7 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageOps
 
 from .config import PlateConfig
-from .curves import contour_regions, cubic_segments, curve_counts, regions_svg
+from .curves import contour_regions, cubic_segments, curve_counts, regions_svg, sample_segments
 from .image_pipeline import (
     composite_preview,
     correct_illumination,
@@ -30,12 +30,7 @@ def _save_curve_preview(layers: list[PlateLayer], config: PlateConfig) -> Image.
     single_layer = len(layers) == 1
 
     def sampled(points):
-        result = []
-        for p0, c1, c2, p3 in cubic_segments(points):
-            for t in np.linspace(0, 1, 9):
-                point = (1-t)**3*p0 + 3*(1-t)**2*t*c1 + 3*(1-t)*t*t*c2 + t**3*p3
-                result.append(tuple(point * ppm))
-        return result
+        return [tuple(p) for p in (sample_segments(cubic_segments(points)) * ppm).tolist()]
 
     for layer in reversed(layers):
         color = (238, 174, 54) if single_layer else tuple(
@@ -48,11 +43,27 @@ def _save_curve_preview(layers: list[PlateLayer], config: PlateConfig) -> Image.
     return ImageOps.mirror(image) if config.mirror_for_print else image
 
 
+def write_proof(layers: list[PlateLayer], config: PlateConfig, directory: Path) -> Path:
+    path = directory / "proof-preview.png"
+    temporary = directory / ".proof-preview.tmp.png"
+    make_proof(layers, config).save(temporary, compress_level=1)
+    temporary.replace(path)
+    return path
+
+
 def analyze_image(
     data: bytes,
     raw_config: PlateConfig | dict,
     output_root: Path | None = None,
+    *,
+    defer_proof: bool = False,
 ) -> AnalysisResult:
+    """Analyse an image into printable plate layers.
+
+    With ``defer_proof`` the (relatively slow) washi proof is not rendered
+    here; call :func:`write_proof` later, e.g. from a background thread, so an
+    interactive UI can show the plate immediately.
+    """
     config = (
         raw_config.resolved()
         if isinstance(raw_config, PlateConfig)
@@ -85,15 +96,16 @@ def analyze_image(
     if not config.mirror_for_print:
         print_preview = ImageOps.mirror(print_preview)
     curve_preview = _save_curve_preview(layers, config)
-    source.save(directory / "source.png")
-    corrected.save(directory / "corrected.png")
-    print_preview.save(directory / "print-preview.png")
-    curve_preview.save(directory / "curve-preview.png")
-    make_proof(layers, config).save(directory / "proof-preview.png")
+    source.save(directory / "source.png", compress_level=1)
+    corrected.save(directory / "corrected.png", compress_level=1)
+    print_preview.save(directory / "print-preview.png", compress_level=1)
+    curve_preview.save(directory / "curve-preview.png", compress_level=1)
+    if not defer_proof:
+        write_proof(layers, config, directory)
     for layer in layers:
-        mask_preview(layer.mask, layer.color_hex).save(directory / f"{layer.name}-mask.png")
+        mask_preview(layer.mask, layer.color_hex).save(directory / f"{layer.name}-mask.png", compress_level=1)
         (directory / f"{layer.name}.svg").write_text(layer.svg, encoding="utf-8")
-        make_heightmap(layer, config).save(directory / f"{layer.name}-height.png")
+        make_heightmap(layer, config).save(directory / f"{layer.name}-height.png", compress_level=1)
 
     total_segments = sum(item["bezier_segments"] for item in all_metrics)
     warnings = []
