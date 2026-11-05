@@ -26,6 +26,7 @@ def _config_from_args(args: argparse.Namespace) -> PlateConfig:
         title=args.title or Path(args.image).stem,
         halftone_pitch_mm=args.dot_pitch,
         remove_scan_frame=not args.keep_scan_frame,
+        trap_mm=args.trap,
     ).resolved()
 
 
@@ -77,6 +78,7 @@ def build_parser() -> argparse.ArgumentParser:
     convert.add_argument("--detail", type=float, default=0.68)
     convert.add_argument("--contrast", type=float, default=0.55)
     convert.add_argument("--colors", type=int, default=3)
+    convert.add_argument("--trap", type=float, default=0.20, help="colour plates: spread lighter inks this many mm under darker ones (0 = off)")
     convert.add_argument("--title")
     convert.add_argument("--invert", action="store_true")
     convert.add_argument("--no-mirror", action="store_true")

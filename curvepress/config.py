@@ -35,6 +35,7 @@ class PlateConfig:
     halftone_max_dot_mm: float = 1.60
     registration_marks: bool = True
     registration_band_mm: float = 6.0
+    trap_mm: float = 0.20
     proof_seed: int = 7
     title: str = "curvepress_plate"
 
@@ -81,7 +82,7 @@ class PlateConfig:
         for key, low, high in (
             ("width_mm", 20, 256), ("height_mm", 20, 256), ("nozzle_mm", 0.2, 1.2),
             ("layer_height_mm", 0.05, 0.5), ("halftone_pitch_mm", 0.2, 20),
-            ("halftone_min_dot_mm", 0.1, 20), ("halftone_max_dot_mm", 0.1, 20),
+            ("halftone_min_dot_mm", 0.1, 20), ("halftone_max_dot_mm", 0.1, 20), ("trap_mm", 0.0, 1.0),
         ):
             if not low <= data[key] <= high:
                 raise ValueError(f"{key} must be between {low} and {high}")

@@ -35,3 +35,13 @@ The default plate is 0.8 mm base, 1.2 mm relief, and 2.0 mm total height. If a p
 For use with food, skin, or fabric, verify the safety of the chosen material and ink separately.
 
 
+
+## Colour plates: trapping and print order
+
+- Print **lightest to darkest**. Every export includes `PRINT_GUIDE.md` with the exact order for your plates.
+- Trapping (default 0.20 mm) spreads each lighter plate under the darker ones, so a little misregistration shows no white gap. Raise it (0.3-0.4 mm) for hand-held baren printing; set 0 for a registration jig you trust. The effective width cannot be finer than one analysis pixel (1/`analysis_ppm` mm).
+- If fine lines fill in or thin out, change the slicer's XY size compensation in 0.05 mm steps.
+
+## Letterpress (type-high)
+
+Type-high is 0.918 in = 23.32 mm. A 2.0 mm plate needs about 21.3 mm of build-up (chipboard, card, or a printed base). Build up rather than grind down, and measure against your own type and rails.

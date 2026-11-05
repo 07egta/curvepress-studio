@@ -8,7 +8,7 @@ from PIL import Image, ImageOps
 from scipy import ndimage
 
 from .config import PlateConfig
-from .physical import apply_printability, registration_mask
+from .physical import apply_printability, apply_trapping, registration_mask
 
 
 PALETTE = ["#101820", "#174a7e", "#43a6c6", "#e56b4a", "#e3b341", "#6d597a"]
@@ -314,8 +314,7 @@ def make_masks(
         }
         candidates = [("ink", "#111827", generators[config.style](corrected, config))]
 
-    layers = []
-    reports = []
+    cleaned_layers = []
     for name, color, mask in candidates:
         cleaned, report = apply_printability(
             mask ^ config.invert,
@@ -323,12 +322,21 @@ def make_masks(
             content_box,
         )
         if np.count_nonzero(cleaned):
-            if config.uses_registration():
-                cleaned = cleaned | registration_mask(cleaned.shape, config)
-            layers.append((name, color, cleaned))
-            reports.append(report)
-    if not layers:
+            cleaned_layers.append((name, color, cleaned, report))
+    if not cleaned_layers:
         raise ValueError("no printable artwork remained; increase contrast or reduce cleanup")
+
+    # Colour plates are ordered darkest first, which is the order trapping needs.
+    masks = [item[2] for item in cleaned_layers]
+    spread = apply_trapping(masks, config) if config.style == "color_layers" else [0.0] * len(masks)
+
+    layers = []
+    reports = []
+    for (name, color, _, report), mask, extra in zip(cleaned_layers, masks, spread):
+        if config.uses_registration():
+            mask = mask | registration_mask(mask.shape, config)
+        layers.append((name, color, mask))
+        reports.append({**report, "trap_added_fraction": round(extra, 4)})
     return layers, reports
 
 

@@ -62,6 +62,7 @@ def _analysis_payload(result: AnalysisResult) -> dict:
             "curves": _artifact_url(result.job_id, "curve-preview.png"),
             "proof": _artifact_url(result.job_id, "proof-preview.png"),
         },
+        "guide": _artifact_url(result.job_id, "PRINT_GUIDE.md"),
         "layers": [
             {
                 "name": layer.name,
@@ -83,7 +84,7 @@ def _bundle(result: AnalysisResult) -> Path:
         item
         for item in result.directory.iterdir()
         if item.is_file() and item != path and item.suffix.lower() in {
-            ".png", ".svg", ".step", ".stl", ".3mf", ".json"
+            ".png", ".svg", ".step", ".stl", ".3mf", ".json", ".md"
         }
     ]
     temporary = path.with_suffix(f".{uuid.uuid4().hex}.tmp")

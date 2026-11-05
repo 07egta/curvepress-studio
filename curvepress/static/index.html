@@ -213,6 +213,7 @@ main{display:grid;grid-template-rows:auto 1fr auto;min-width:0;min-height:0;back
           <svg viewBox="0 0 38 30" fill="none"><rect x="2" y="9" width="17" height="14" rx="1" fill="#2c5a8c" opacity=".85"/><rect x="11" y="5" width="17" height="14" rx="1" fill="#d6a24a" opacity=".85"/><rect x="19" y="11" width="17" height="14" rx="1" fill="#26282b" opacity=".75"/></svg></button>
       </div>
       <div class="sub range hidden" id="colorsWrap"><label for="colors" data-t="colors"></label><output id="colorsOut"></output><input id="colors" type="range" min="2" max="6" value="4"></div>
+      <div class="sub range hidden" id="trapWrap"><label for="trap" data-t="trap"></label><output id="trapOut"></output><input id="trap" type="range" min="0" max="0.5" step="0.05" value="0.2"></div>
       <div class="sub range hidden" id="pitchWrap"><label for="pitch" data-t="pitch"></label><output id="pitchOut"></output><input id="pitch" type="range" min="1.2" max="4" step="0.1" value="1.7"></div>
     </section>
 
@@ -306,7 +307,7 @@ ja:{tagline:'画像から、刷れる版へ',local:'この端末の中だけで�
  vCompare:'見比べる',vPlate:'版を回す',vCurves:'凸になる所',vCorrected:'補正後',left:'原画',right:'刷り上がり',
  welcomeTitle:'画像を、刷れる版に。',welcomeText:'左で画像を選ぶと、版と刷り上がりがここに出ます。3Dプリンターで印刷して、インクを付けて紙に刷れます。',
  loading:'画像を読み込んでいます…',working:'版を作っています…',ready:'できました',failed:'うまくいきませんでした: {m}',tooLarge:'30MB以下の画像にしてください',notImage:'画像として読み込めませんでした',
- fPlate:'版',fHeight:'厚み',fPlates:'版の数',fCurves:'曲線',fKento:'見当',on:'あり',
+ fPlate:'版',fHeight:'厚み',fPlates:'版の数',fCurves:'曲線',fKento:'見当',fTrap:'のせ幅',on:'あり',off:'なし',trap:'のせ幅（見当ズレ対策）',guide:'印刷ガイド',
  c3d:'実物の版（左右反転）・ドラッグで回転',cCurves:'黄色い所が盛り上がります',cCompare:'境目をドラッグして見比べ',x1:'高さ 実寸',x3:'高さ ×3',noWebgl:'このブラウザでは3D表示ができません',
  n_bed_a1mini:'A1 mini（180mm角）より大きい版です',n_step_skipped:'{l}: 点が {n} 個あるのでSTEPは作りません。3MF/STL/SVGは使えます',n_fragile:'{l}: 細かすぎる所があります。「細部」を下げるか、スライサーでArachneを使ってください',n_heavy_ink:'{l}: ベタ面が広いので、インクは薄く伸ばしてください'},
 en:{tagline:'From an image to a plate you can print with',local:'Everything stays on this computer',s1:'Image',drop:'Drop an image or choose one',dropHint:'JPG, PNG, WebP, SVG… up to 30 MB · paste works too',tryWith:'Try it with',change:'Click to use another image',sampleName:'Hokusai’s Great Wave',
@@ -317,7 +318,7 @@ en:{tagline:'From an image to a plate you can print with',local:'Everything stay
  vCompare:'Compare',vPlate:'Plate in 3D',vCurves:'Raised areas',vCorrected:'Corrected',left:'Original',right:'Print',
  welcomeTitle:'Turn an image into a printing plate.',welcomeText:'Choose an image on the left and the plate and its print appear here. 3D-print the plate, ink it, and press it onto paper.',
  loading:'Loading image…',working:'Making the plate…',ready:'Done',failed:'That didn’t work: {m}',tooLarge:'Use an image under 30 MB',notImage:'This file couldn’t be read as an image',
- fPlate:'Plate',fHeight:'Thickness',fPlates:'Plates',fCurves:'Curves',fKento:'Registration',on:'on',
+ fPlate:'Plate',fHeight:'Thickness',fPlates:'Plates',fCurves:'Curves',fKento:'Registration',fTrap:'Trap',on:'on',off:'off',trap:'Trap (hides misregistration)',guide:'Print guide',
  c3d:'The real plate (mirrored) · drag to rotate',cCurves:'Yellow areas are raised',cCompare:'Drag the edge to compare',x1:'True height',x3:'Height ×3',noWebgl:'3D view isn’t available in this browser',
  n_bed_a1mini:'Larger than the A1 mini bed (180 mm square)',n_step_skipped:'{l}: {n} separate dots, so no STEP. 3MF/STL/SVG are fine',n_fragile:'{l}: some parts are very fine. Lower Detail or use Arachne in your slicer',n_heavy_ink:'{l}: large solid areas. Roll the ink thin'},
 zh:{tagline:'从图像到可以印刷的版',local:'全部在本机处理',s1:'图像',drop:'拖入或选择图像',dropHint:'JPG、PNG、WebP、SVG 等（30MB以内）· 也可以粘贴',tryWith:'试一试',change:'点击更换图像',sampleName:'北斋《神奈川冲浪里》',
@@ -328,7 +329,7 @@ zh:{tagline:'从图像到可以印刷的版',local:'全部在本机处理',s1:'�
  vCompare:'对比',vPlate:'3D 版',vCurves:'凸起部分',vCorrected:'校正后',left:'原图',right:'印刷效果',
  welcomeTitle:'把图像变成可以印刷的版。',welcomeText:'在左侧选择图像，版和印刷效果会显示在这里。用 3D 打印机打印出版，上墨后压印到纸上。',
  loading:'正在读取图像…',working:'正在制作版…',ready:'完成',failed:'没有成功：{m}',tooLarge:'请使用 30MB 以内的图像',notImage:'无法作为图像读取',
- fPlate:'版',fHeight:'厚度',fPlates:'版数',fCurves:'曲线',fKento:'规矩',on:'有',
+ fPlate:'版',fHeight:'厚度',fPlates:'版数',fCurves:'曲线',fKento:'规矩',fTrap:'叠印扩边',on:'有',off:'无',trap:'叠印扩边（防套印错位）',guide:'打印指南',
  c3d:'实际的版（镜像）· 拖动旋转',cCurves:'黄色部分会凸起',cCompare:'拖动边缘进行对比',x1:'实际高度',x3:'高度 ×3',noWebgl:'此浏览器无法显示 3D',
  n_bed_a1mini:'超过 A1 mini 打印平台（180mm 见方）',n_step_skipped:'{l}：有 {n} 个网点，不生成 STEP。3MF/STL/SVG 可用',n_fragile:'{l}：有过细的部分。请降低“细节”或在切片软件中使用 Arachne',n_heavy_ink:'{l}：大面积实地，请把墨滚薄'}};
 const store={get(k){try{return localStorage.getItem(k)}catch{return null}},set(k,v){try{localStorage.setItem(k,v)}catch{}}};
@@ -353,16 +354,16 @@ function applyLang(next){lang=next;store.set('cp-lang',lang);document.documentEl
 const num=(id)=>Number($('#'+id).value);
 function config(){return{style:S.style,width_mm:num('width'),height_mm:num('height'),nozzle_mm:num('nozzle'),layer_height_mm:num('layer'),
   base_height_mm:$('#base').value.trim()?Number($('#base').value):null,relief_height_mm:$('#relief').value.trim()?Number($('#relief').value):null,
-  detail:num('detail')/100,contrast:num('contrast')/100,color_count:num('colors'),halftone_pitch_mm:num('pitch'),
+  detail:num('detail')/100,contrast:num('contrast')/100,color_count:num('colors'),trap_mm:num('trap'),halftone_pitch_mm:num('pitch'),
   halftone_max_dot_mm:Math.min(1.6,num('pitch')*0.94),mirror_for_print:$('#mirror').checked,registration_marks:$('#kento').checked,
   remove_scan_frame:$('#frame').checked,invert:$('#invert').checked,title:(S.fileName||'curvepress_plate').replace(/\.[^.]+$/,'')}}
 function auto(){const n=num('nozzle'),l=num('layer'),r=v=>Math.max(l,Math.round(v/l)*l);
   const b=$('#base').value.trim()?Number($('#base').value):r(Math.max(.8,n*2)),h=$('#relief').value.trim()?Number($('#relief').value):r(Math.max(1,n*3));return{b,h}}
 function renderThickness(){const {b,h}=auto();$('#thick').textContent=t('thick',{t:(b+h).toFixed(1),b:b.toFixed(1),r:h.toFixed(1)});
   $$('#sizes button').forEach(x=>x.setAttribute('aria-pressed',Number(x.dataset.w)===num('width')&&Number(x.dataset.h)===num('height')))}
-function renderOutputs(){$('#colorsOut').textContent=$('#colors').value;$('#pitchOut').textContent=Number($('#pitch').value).toFixed(1)+' mm';
+function renderOutputs(){$('#colorsOut').textContent=$('#colors').value;$('#trapOut').textContent=num('trap')?num('trap').toFixed(2)+' mm':t('off');$('#pitchOut').textContent=Number($('#pitch').value).toFixed(1)+' mm';
   $('#detailOut').textContent=$('#detail').value+'%';$('#contrastOut').textContent=$('#contrast').value+'%';
-  $('#colorsWrap').classList.toggle('hidden',S.style!=='color_layers');$('#pitchWrap').classList.toggle('hidden',S.style!=='halftone');
+  $('#colorsWrap').classList.toggle('hidden',S.style!=='color_layers');$('#trapWrap').classList.toggle('hidden',S.style!=='color_layers');$('#pitchWrap').classList.toggle('hidden',S.style!=='halftone');
   $$('#styles .style').forEach(b=>{b.setAttribute('aria-checked',b.dataset.style===S.style);b.tabIndex=b.dataset.style===S.style?0:-1})}
 
 /* ---------- image input ---------- */
@@ -411,7 +412,7 @@ const post=(url,body)=>fetch(url,{method:'POST',headers:{'Content-Type':'applica
 $$('#styles .style').forEach(b=>b.addEventListener('click',()=>{S.style=b.dataset.style;schedule()}));
 $('#styles').addEventListener('keydown',e=>{const k=['ArrowRight','ArrowDown','ArrowLeft','ArrowUp'].indexOf(e.key);if(k<0)return;e.preventDefault();
   const list=$$('#styles .style'),i=list.findIndex(b=>b.dataset.style===S.style),n=list[(i+(k<2?1:-1)+list.length)%list.length];S.style=n.dataset.style;n.focus();schedule()});
-['colors','pitch','detail','contrast'].forEach(id=>$('#'+id).addEventListener('input',()=>{renderOutputs();schedule()}));
+['colors','trap','pitch','detail','contrast'].forEach(id=>$('#'+id).addEventListener('input',()=>{renderOutputs();schedule()}));
 ['width','height','base','relief'].forEach(id=>$('#'+id).addEventListener('input',()=>{const w=num('width'),h=num('height');if(w>=20&&w<=256&&h>=20&&h<=256)schedule();else renderThickness()}));
 ['nozzle','layer','mirror','kento','frame','invert'].forEach(id=>$('#'+id).addEventListener('change',schedule));
 $('#swap').addEventListener('click',()=>{const w=$('#width').value;$('#width').value=$('#height').value;$('#height').value=w;schedule()});
@@ -423,7 +424,7 @@ const link=(href,label,name)=>`<a class="dl" href="${href}" download${name?`="${
 function renderFiles(){const d=S.data;if(!d)return;$('#filesEmpty').classList.add('hidden');const box=$('#files');box.classList.remove('hidden');
   const multi=d.layers.length>1;
   box.innerHTML=d.layers.map((l,i)=>`<div class="plate-row"><span class="swatch" style="background:${multi?l.color:'var(--ai)'}"></span><span class="name">${multi?`${t('fPlate')} ${i+1}`:t('fPlate')}</span><div class="links">${link(l['3mf'],'3MF')}${link(l.stl,'STL')}${link(l.svg,'SVG')}</div></div>`).join('')
-   +`<div class="plate-row all"><div class="links">${link(d.bundle,t('zip'))}${link(d.previews.proof,'PNG',`proof-preview.png`)}</div></div>`}
+   +`<div class="plate-row all"><div class="links">${link(d.bundle,t('zip'))}${link(d.previews.proof,'PNG',`proof-preview.png`)}${d.guide?link(d.guide,t('guide'),'PRINT_GUIDE.md'):''}</div></div>`}
 function renderStep(){const d=S.data;$('#stepBox').classList.toggle('hidden',!d);if(!d)return;const st=S.step,btn=$('#makeStep');
   const skipped=(d.metrics.notes||[]).filter(n=>n.code==='step_skipped');
   btn.disabled=!!st&&st.state!=='error';btn.classList.toggle('hidden',!!st&&st.state==='done');btn.innerHTML=st&&st.state==='running'?`<i class="spinner"></i><span>${t('stepBusy')}</span>`:`<span>${t('makeStep')}</span>`;
@@ -444,7 +445,7 @@ function renderFacts(){const d=S.data;if(!d){$('#facts').innerHTML='';return}con
   const notes=(m.notes||[]).map(n=>`<div class="note">${escapeHtml(t('n_'+n.code,{l:n.layer==='ink'?t('fPlate'):(n.layer||'').replace('plate_',t('fPlate')+' '),n:(n.n||0).toLocaleString()}))}</div>`).join('');
   $('#facts').innerHTML=fact('fPlate',`${m.plate_mm[0]} × ${m.plate_mm[1]} mm`)+fact('fHeight',`${m.total_height_mm.toFixed(1)} mm`)
     +(d.layers.length>1?fact('fPlates',d.layers.length):'')+fact('fCurves',m.total_bezier_segments.toLocaleString())
-    +(m.registration_marks?fact('fKento',t('on')):'')+(notes?`<div class="notes">${notes}</div>`:'')}
+    +(m.registration_marks?fact('fKento',t('on')):'')+(d.layers.length>1&&m.trap_mm?fact('fTrap',m.trap_mm.toFixed(2)+' mm'):'')+(notes?`<div class="notes">${notes}</div>`:'')}
 const escapeHtml=s=>s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
 /* ---------- views ---------- */

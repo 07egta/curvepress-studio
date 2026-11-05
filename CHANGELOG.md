@@ -4,6 +4,20 @@ All notable changes to CurvePress Studio are documented here.
 
 CurvePress is in beta. Version notes describe the repository state and may not represent a packaged release.
 
+## 0.3.1 — 2026-11-05
+
+### English
+
+- **Trapping for colour plates**: lighter plates are spread slightly (default 0.20 mm, slider 0–0.5 mm, `--trap` on the CLI) *under* the darker plates, the standard print-shop fix for white gaps from misregistration. The spread only grows into areas a darker plate covers, so the picture does not change and no ink reaches bare paper.
+- **PRINT_GUIDE.md** is written with every export (and included in the ZIP): slicer settings, mirroring, print order, registration use, trap width and how much build-up a letterpress type-high (0.918 in = 23.32 mm) setup needs.
+- `docs/RESEARCH.md` collects the sources behind these choices.
+
+### 日本語
+
+- **色分けにトラッピング（のせ）を追加**：明るい色の版を暗い色の版の下へ少し広げます（既定0.20 mm、スライダー0〜0.5 mm、CLIは`--trap`）。見当が少しズレても紙の白い隙間が出にくくなります。暗い色が覆う部分にしか広がらないので、絵は変わりません。
+- **PRINT_GUIDE.md を毎回自動で作成**（ZIPにも入ります）：スライサー設定、反転、刷る順、見当の使い方、のせ幅、活版のtype-high（0.918 in ＝ 23.32 mm）に必要なかさ上げ量。
+- 調べた根拠は `docs/RESEARCH.md` にまとめました。
+
 ## 0.3.0 — 2026-11-01
 
 ### English

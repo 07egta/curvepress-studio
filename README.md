@@ -46,6 +46,12 @@ flowchart LR
     E --> F[Print & test]
 ```
 
+## New in 0.3.1 — no more white gaps
+
+- **Trapping**: in colour-plate mode lighter inks are spread a hair under the darker ones (default 0.20 mm), so small misregistration no longer leaves bare paper between colours.
+- **PRINT_GUIDE.md** in every export: slicer settings, print order, mirroring and letterpress type-high build-up for *your* plate.
+- Background and sources: [docs/RESEARCH.md](docs/RESEARCH.md).
+
 ## New in 0.3 — faster, simpler
 
 <p align="center"><img src="docs/images/studio.jpg" width="92%" alt="CurvePress Studio: style choices on the left, original and pulled print compared on the printing table"></p>
@@ -204,6 +210,11 @@ Issues and pull requests are welcome. Please include enough input and configurat
 CurvePress Studioは、写真・スキャン・ロゴ・線画を、FDM方式の3Dプリンターで出力できる凹凸プレートへ変換するローカルアプリです。画像の構図を同じ座標で保ちながら、画素を滑らかな曲線に変換し、SVG・STEP・3MF・STLを出力します。
 
 画像は自分のPC上で処理され、クラウドの画像サービスへ送信されません。
+
+### 0.3.1の新機能 — 白い隙間を出にくく
+
+- **トラッピング（のせ）**：色分けで、明るい色を暗い色の下へ少し広げます（既定0.20 mm）。見当が少しズレても色の間に紙が見えにくくなります。
+- **PRINT_GUIDE.md**：スライサー設定・刷る順・反転・活版type-highのかさ上げ量を、その版に合わせて毎回書き出します。
 
 ### 0.3の新機能 — 速く、かんたんに
 

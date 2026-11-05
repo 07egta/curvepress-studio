@@ -18,6 +18,7 @@ from .image_pipeline import (
     make_masks,
     mask_preview,
 )
+from .guide import build_guide, type_high_shim_mm
 from .models import AnalysisResult, PlateLayer
 from .proof import make_heightmap, make_proof
 
@@ -130,11 +131,16 @@ def analyze_image(
         "total_height_mm": config.base_height_mm + config.relief_height_mm,
         "mirrored_for_print": config.mirror_for_print,
         "registration_marks": config.uses_registration(),
+        "trap_mm": config.trap_mm if len(layers) > 1 else 0.0,
+        "type_high_shim_mm": type_high_shim_mm(config.base_height_mm + config.relief_height_mm),
         "notes": notes,
         "layers": all_metrics,
         "total_bezier_segments": total_segments,
         "auto_settings": config.public_dict(),
     }
+    (directory / "PRINT_GUIDE.md").write_text(
+        build_guide(config, [layer.name for layer in layers]), encoding="utf-8"
+    )
     (directory / "analysis.json").write_text(
         json.dumps(metrics, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",

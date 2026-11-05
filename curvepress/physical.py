@@ -115,6 +115,36 @@ def apply_printability(
 
 
 
+def apply_trapping(masks: list[np.ndarray], config: PlateConfig) -> list[float]:
+    """Spread each lighter colour plate a hair under the darker plates (in place).
+
+    Hand printing never registers perfectly, and a sliver of bare paper between
+    two colours is the most visible flaw.  Print shops fix it with a *trap*: the
+    lighter colour is made slightly larger so it tucks beneath the darker one,
+    where it is invisible.  ``masks`` must be ordered darkest first.  The spread
+    only ever grows into area a darker plate covers, so the printed picture does
+    not change and no ink creeps onto bare paper.
+
+    Returns, per plate, the fraction of extra area that was added.
+    """
+    added = [0.0] * len(masks)
+    if config.trap_mm <= 0 or len(masks) < 2:
+        return added
+    # One analysis pixel is the finest step the masks can express.
+    radius = max(1.0, config.trap_mm * config.analysis_ppm)
+    darker = masks[0].copy()
+    for index in range(1, len(masks)):
+        mask = masks[index]
+        if mask.any() and darker.any():
+            distance = ndimage.distance_transform_edt(~mask)
+            spread = (distance <= radius) & darker & ~mask
+            if spread.any():
+                added[index] = float(np.count_nonzero(spread)) / max(1, int(np.count_nonzero(mask)))
+                masks[index] = mask | spread
+        darker |= masks[index]
+    return added
+
+
 def registration_mask(shape: tuple[int, int], config: PlateConfig) -> np.ndarray:
     """Japanese woodblock kento marks, identical on every colour plate.
 
