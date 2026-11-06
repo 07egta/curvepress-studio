@@ -46,6 +46,11 @@ flowchart LR
     E --> F[Print & test]
 ```
 
+## New in 0.3.2 — big plates, small printers
+
+- **Tiling**: pick your printer bed and oversized plates are cut into exact, closed tiles (`--bed 180` on the CLI).
+- **Test plate**: `curvepress testplate` (or the link under More settings) writes a plate of lines, gaps, dots and holes to learn your printer's finest detail.
+
 ## New in 0.3.1 — no more white gaps
 
 - **Trapping**: in colour-plate mode lighter inks are spread a hair under the darker ones (default 0.20 mm), so small misregistration no longer leaves bare paper between colours.
@@ -210,6 +215,11 @@ Issues and pull requests are welcome. Please include enough input and configurat
 CurvePress Studioは、写真・スキャン・ロゴ・線画を、FDM方式の3Dプリンターで出力できる凹凸プレートへ変換するローカルアプリです。画像の構図を同じ座標で保ちながら、画素を滑らかな曲線に変換し、SVG・STEP・3MF・STLを出力します。
 
 画像は自分のPC上で処理され、クラウドの画像サービスへ送信されません。
+
+### 0.3.2の新機能 — 大きな版を小さなプリンタで
+
+- **タイル分割**：プリンターのベッドを選ぶと、入らない版を穴なしのタイルに切ります（CLIは`--bed 180`）。
+- **テスト板**：`curvepress testplate`（または詳細設定のリンク）で、線・すき間・点・穴の見本板を作り、プリンタの最小の細かさを調べられます。
 
 ### 0.3.1の新機能 — 白い隙間を出にくく
 

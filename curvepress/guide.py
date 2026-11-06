@@ -7,6 +7,7 @@ printed relief plates; see ``docs/RESEARCH.md`` for the sources.
 from __future__ import annotations
 
 from .config import PlateConfig
+from .tiles import plan_tiles
 
 TYPE_HIGH_MM = 23.32  # 0.918 in, the usual letterpress type height
 
@@ -21,6 +22,8 @@ def build_guide(config: PlateConfig, plate_names: list[str]) -> str:
     plates = len(plate_names)
     multi = plates > 1
     shim = type_high_shim_mm(total)
+    tiles = plan_tiles(config)
+    cols, rows = len({t.col for t in tiles}), len({t.row for t in tiles})
     order_ja = " → ".join(reversed(plate_names))
     ja = [
         "# 印刷ガイド / Printing guide",
@@ -59,6 +62,15 @@ def build_guide(config: PlateConfig, plate_names: list[str]) -> str:
                 if config.trap_mm > 0
                 else "- トラッピングはオフです。見当がズレると色の境目に白い隙間が出ます。"
             ),
+        ]
+    if len(tiles) > 1:
+        ja += [
+            "",
+            "## 分割して印刷（タイル）",
+            "",
+            f"- ベッド {config.bed_mm:g} mm に収まるよう、各版を横{cols}×縦{rows}＝{len(tiles)}枚に切ってあります。ファイル名の `r行c列` は、刷る面を上から見たときの位置（r1c1が左上）です。",
+            "- 平らな台紙（MDF・アクリル・厚いチップボード）に、すき間なく突き合わせて貼ります。切り口は平らなので、定規を当てて端をそろえてください。",
+            "- 各タイルは同じ厚み・同じ向き（反転済み）で出力しています。",
         ]
     ja += [
         "",
@@ -99,6 +111,12 @@ def build_guide(config: PlateConfig, plate_names: list[str]) -> str:
                 if config.trap_mm > 0
                 else "**Trapping** - off; misregistration will show white gaps at colour borders."
             ),
+        ]
+    if len(tiles) > 1:
+        en += [
+            "",
+            f"**Tiles** - to fit the {config.bed_mm:g} mm bed each plate is cut into {cols} x {rows} = {len(tiles)} tiles. "
+            "`rNcM` in the file name is the position seen from above (r1c1 = top left). Butt them edge to edge on a flat backing board (MDF, acrylic, thick chipboard) and square the edges with a ruler.",
         ]
     en += [
         "",

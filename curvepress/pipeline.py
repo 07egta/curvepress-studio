@@ -18,6 +18,7 @@ from .image_pipeline import (
     make_masks,
     mask_preview,
 )
+from .tiles import plan_tiles
 from .guide import build_guide, type_high_shim_mm
 from .models import AnalysisResult, PlateLayer
 from .proof import make_heightmap, make_proof
@@ -112,7 +113,10 @@ def analyze_image(
     # ``notes`` are machine-readable (the UI translates them); ``warnings``
     # keeps the English sentences for the CLI and the JSON report.
     notes: list[dict] = []
-    if max(config.width_mm, config.height_mm) > 180:
+    tiles = plan_tiles(config)
+    if len(tiles) > 1:
+        notes.append({"code": "tiled", "n": len(tiles), "text": f"Each plate is split into {len(tiles)} tiles to fit the {config.bed_mm:g} mm bed; glue them edge to edge on a flat backing board."})
+    elif max(config.width_mm, config.height_mm) > 180 and config.bed_mm <= 0:
         notes.append({"code": "bed_a1mini", "text": "Plate exceeds the A1 mini 180 × 180 mm bed; use a larger printer or reduce the size."})
     for item in all_metrics:
         name = item["name"]
@@ -131,6 +135,7 @@ def analyze_image(
         "total_height_mm": config.base_height_mm + config.relief_height_mm,
         "mirrored_for_print": config.mirror_for_print,
         "registration_marks": config.uses_registration(),
+        "tiles": {"count": len(tiles), "cols": len({t.col for t in tiles}), "rows": len({t.row for t in tiles})},
         "trap_mm": config.trap_mm if len(layers) > 1 else 0.0,
         "type_high_shim_mm": type_high_shim_mm(config.base_height_mm + config.relief_height_mm),
         "notes": notes,

@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import json
 import mimetypes
+import tempfile
 import threading
 import traceback
 import webbrowser
@@ -13,13 +14,14 @@ import uuid
 from collections import OrderedDict
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import unquote, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 from . import __version__
 from .config import PlateConfig
 from .exporter import export_analysis, export_meshes
 from .models import AnalysisResult
 from .pipeline import analyze_image, write_proof
+from .testplate import write_test_plate_zip
 
 
 STATIC_ROOT = Path(__file__).with_name("static")
@@ -50,6 +52,9 @@ def _title(result: AnalysisResult) -> str:
 
 
 def _analysis_payload(result: AnalysisResult) -> dict:
+    tile_count = int(result.metrics.get("tiles", {}).get("count", 1))
+    tiled = tile_count > 1
+    tiles_stl, tiles_3mf = "_stl_tiles.zip", "_3mf_tiles.zip"
     return {
         "job_id": result.job_id,
         "bundle": _artifact_url(result.job_id, f"CurvePress_{result.job_id}.zip"),
@@ -70,8 +75,9 @@ def _analysis_payload(result: AnalysisResult) -> dict:
                 "mask": _artifact_url(result.job_id, f"{layer.name}-mask.png"),
                 "svg": _artifact_url(result.job_id, f"{layer.name}.svg"),
                 "height": _artifact_url(result.job_id, f"{layer.name}-height.png"),
-                "stl": _artifact_url(result.job_id, f"{_title(result)}_{layer.name}.stl"),
-                "3mf": _artifact_url(result.job_id, f"{_title(result)}_{layer.name}.3mf"),
+                "stl": _artifact_url(result.job_id, f"{_title(result)}_{layer.name}{tiles_stl if tiled else '.stl'}"),
+                "3mf": _artifact_url(result.job_id, f"{_title(result)}_{layer.name}{tiles_3mf if tiled else '.3mf'}"),
+                "tiles": tile_count,
             }
             for layer in result.layers
         ],
@@ -195,6 +201,24 @@ class CurvePressHandler(BaseHTTPRequestHandler):
             with LOCK:
                 state = EXPORTS.get(job_id, {"state": "idle"})
             self._json(200, state)
+            return
+        if path == "/api/testplate.zip":
+            query = {key: values[-1] for key, values in parse_qs(urlparse(self.path).query).items()}
+            try:
+                config = PlateConfig.from_dict({
+                    "nozzle_mm": query.get("nozzle") or 0.4,
+                    "layer_height_mm": query.get("layer") or 0.2,
+                    "base_height_mm": query.get("base") or None,
+                    "relief_height_mm": query.get("relief") or None,
+                })
+                with tempfile.TemporaryDirectory() as temporary:
+                    archive = Path(temporary) / "testplate.zip"
+                    write_test_plate_zip(archive, config)
+                    body = archive.read_bytes()
+            except Exception as exc:
+                self._json(400, {"error": str(exc)})
+                return
+            self._send(200, body, "application/zip")
             return
         if path.startswith("/api/artifact/"):
             parts = path.split("/", 4)

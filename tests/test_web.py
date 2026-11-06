@@ -49,6 +49,34 @@ class WebTests(unittest.TestCase):
         with response:
             return response.status, response.read()
 
+    def test_test_plate_download(self):
+        status, body = self.request('/api/testplate.zip?nozzle=0.4&layer=0.2', headers={})
+        self.assertEqual(status, 200)
+        with zipfile.ZipFile(io.BytesIO(body)) as archive:
+            self.assertEqual(sorted(archive.namelist()), ['TEST_PLATE.md', 'curvepress_test_plate.3mf', 'curvepress_test_plate.stl'])
+        status, _ = self.request('/api/testplate.zip?nozzle=9', headers={})
+        self.assertEqual(status, 400)
+
+    def test_tiled_plates_link_to_zip_downloads(self):
+        image = Image.new('RGB', (100, 80), 'white')
+        ImageDraw.Draw(image).rectangle((20, 20, 60, 60), fill='black')
+        raw = io.BytesIO()
+        image.save(raw, 'PNG')
+        status, body = self.request('/api/analyze', {
+            'image': 'data:image/png;base64,' + base64.b64encode(raw.getvalue()).decode(),
+            'config': {'width_mm': 100, 'height_mm': 40, 'style': 'poster', 'base_height_mm': '1.0', 'bed_mm': 60},
+        })
+        self.assertEqual(status, 200)
+        data = json.loads(body)
+        self.assertEqual(data['metrics']['tiles']['count'], 2)
+        layer = data['layers'][0]
+        self.assertEqual(layer['tiles'], 2)
+        self.assertTrue(layer['stl'].endswith('_stl_tiles.zip'))
+        status, archive = self.request(layer['stl'], headers={})
+        self.assertEqual(status, 200)
+        with zipfile.ZipFile(io.BytesIO(archive)) as zipped:
+            self.assertEqual(len(zipped.namelist()), 2)
+
     def analyze(self):
         image = Image.new('RGB', (100, 80), 'white')
         ImageDraw.Draw(image).rectangle((20, 20, 60, 60), fill='black')

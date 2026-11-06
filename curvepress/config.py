@@ -36,6 +36,7 @@ class PlateConfig:
     registration_marks: bool = True
     registration_band_mm: float = 6.0
     trap_mm: float = 0.20
+    bed_mm: float = 0.0
     proof_seed: int = 7
     title: str = "curvepress_plate"
 
@@ -86,6 +87,8 @@ class PlateConfig:
         ):
             if not low <= data[key] <= high:
                 raise ValueError(f"{key} must be between {low} and {high}")
+        if data["bed_mm"] != 0 and not 60 <= data["bed_mm"] <= 600:
+            raise ValueError("bed_mm must be 0 (no tiling) or between 60 and 600")
         data["detail"] = max(0.0, min(1.0, data["detail"]))
         data["contrast"] = max(0.0, min(1.0, data["contrast"]))
         data["analysis_ppm"] = int(max(4, min(12, data["analysis_ppm"])))

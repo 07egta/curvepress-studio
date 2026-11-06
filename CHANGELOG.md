@@ -4,6 +4,22 @@ All notable changes to CurvePress Studio are documented here.
 
 CurvePress is in beta. Version notes describe the repository state and may not represent a packaged release.
 
+## 0.3.2 — 2026-11-06
+
+### English
+
+- **Tiling for small printers**: choose your printer bed (A1 mini 180 mm, 220 mm, A1/X1/P1 256 mm, or `--bed` on the CLI) and plates that do not fit are cut into equal tiles (`r1c1` = top left). Each tile is a closed, exact-size 3MF/STL; the UI and the ZIP offer all tiles in one download per format. STEP is not produced for tiled plates.
+- **Test plate** (`curvepress testplate`, or "Download test plate" under More settings): lines 0.2-1.5 mm, gaps 0.2-0.8 mm, dots and holes. One short print shows the finest detail your printer and slicer profile can reproduce.
+- **More robust meshes**: when the fast triangulator leaves open edges (rows of aligned straight bars), the plate is automatically rebuilt with a constrained-Delaunay triangulator.
+- New dependency: `shapely>=2.1`.
+
+### 日本語
+
+- **小さいプリンタ向けのタイル分割**：プリンターのベッド（A1 mini 180 mm、220 mm、A1/X1/P1 256 mm。CLIは`--bed`）を選ぶと、入らない版を等分のタイルに切ります（`r1c1`が左上）。各タイルは穴なし・寸法ぴったりの3MF/STLで、画面とZIPからは形式ごとに1回でまとめて保存できます。分割した版のSTEPは作りません。
+- **テスト板**（`curvepress testplate`、または「詳細設定」の「テスト板をダウンロード」）：線0.2〜1.5 mm、すき間0.2〜0.8 mm、点と穴。1回の短い印刷で、あなたのプリンタとスライサー設定で出せる細かさが分かります。
+- **メッシュをさらに堅牢に**：高速な三角分割で開いた辺ができる場合（まっすぐな棒が並ぶ絵など）、自動で別方式（制約付きドロネー）に切り替えて作り直します。
+- 新しい依存：`shapely>=2.1`。
+
 ## 0.3.1 — 2026-11-05
 
 ### English

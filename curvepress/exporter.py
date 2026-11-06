@@ -12,6 +12,7 @@ import numpy as np
 from .config import PlateConfig
 from .curves import cubic_segments, signed_area
 from .mesh import build_plate_mesh, mesh_volume, write_binary_stl
+from .tiles import build_tile_mesh, layer_solid, mesh_from_solid, plan_tiles, write_zip
 from .models import AnalysisResult, CurveRegion, PlateLayer
 
 
@@ -398,6 +399,59 @@ def _mesh_stats(vertices: np.ndarray, triangles: np.ndarray) -> dict:
     }
 
 
+def build_closed_mesh(layer: PlateLayer, config: PlateConfig) -> tuple[np.ndarray, np.ndarray]:
+    """Plate mesh that is guaranteed closed.
+
+    The fast ear-clipping builder is used first.  Ear clipping can emit zero-area
+    slivers when vertices of different loops are collinear (a row of straight bars,
+    say), which leaves open edges; in that case the plate is rebuilt with the
+    constrained-Delaunay builder, which does not have that weakness.
+    """
+    vertices, triangles = build_plate_mesh(layer, config)
+    stats = _mesh_stats(vertices, triangles)
+    if stats["mesh_boundary_edges"] or stats["mesh_nonmanifold_edges"]:
+        vertices, triangles = mesh_from_solid(
+            layer_solid(layer, config), config.width_mm, config.height_mm,
+            config.base_height_mm, config.base_height_mm + config.relief_height_mm,
+        )
+    return vertices, triangles
+
+
+def write_tile_meshes(layer: PlateLayer, config: PlateConfig, directory: Path, stem: str) -> dict:
+    """3MF + STL per bed-sized tile, plus one ZIP of each format for the UI.
+
+    Every tile is checked to be closed and to have exactly the tile's size.
+    """
+    tiles = plan_tiles(config)
+    solid = layer_solid(layer, config)
+    height = config.base_height_mm + config.relief_height_mm
+    stl_files, mf_files, volume = [], [], 0.0
+    for tile in tiles:
+        vertices, triangles = build_tile_mesh(solid, tile, config)
+        stats = _mesh_stats(vertices, triangles)
+        if stats["mesh_boundary_edges"] or stats["mesh_nonmanifold_edges"]:
+            raise RuntimeError(f"tile {tile.name} mesh is not closed: {stats}")
+        bounds = (vertices.max(axis=0) - vertices.min(axis=0)).astype(float).tolist()
+        expected = [tile.x1 - tile.x0, tile.y1 - tile.y0, height]
+        if any(abs(a - b) > 0.02 for a, b in zip(bounds, expected)):
+            raise RuntimeError(f"tile {tile.name} dimensions drifted: {bounds} vs {expected}")
+        volume += mesh_volume(vertices, triangles)
+        stl = directory / f"{stem}_{tile.name}.stl"
+        mf = directory / f"{stem}_{tile.name}.3mf"
+        write_binary_stl(stl, vertices, triangles)
+        _write_3mf(mf, vertices, triangles)
+        stl_files.append(stl)
+        mf_files.append(mf)
+    zips = [directory / f"{stem}_stl_tiles.zip", directory / f"{stem}_3mf_tiles.zip"]
+    write_zip(zips[0], stl_files)
+    write_zip(zips[1], mf_files)
+    return {
+        "tiles": len(tiles),
+        "files": [p.name for p in (*stl_files, *mf_files, *zips)],
+        "mesh_volume_mm3": round(volume, 3),
+    }
+
+
 def export_layer(layer: PlateLayer, config: PlateConfig, directory: Path) -> dict:
     """SVG + 3MF + STL always; STEP when the artwork is CAD-friendly.
 
@@ -409,7 +463,25 @@ def export_layer(layer: PlateLayer, config: PlateConfig, directory: Path) -> dic
     svg_path = directory / f"{stem}.svg"
     svg_path.write_text(layer.svg, encoding="utf-8")
 
-    vertices, triangles = build_plate_mesh(layer, config)
+    if len(plan_tiles(config)) > 1:
+        tiled = write_tile_meshes(layer, config, directory, stem)
+        return {
+            "layer": layer.name,
+            "dimensions_mm": [config.width_mm, config.height_mm, config.base_height_mm + config.relief_height_mm],
+            "mesh_volume_mm3": tiled["mesh_volume_mm3"],
+            "regions": len(layer.regions),
+            "holes": sum(len(region.holes) for region in layer.regions),
+            "tiles": tiled["tiles"],
+            "mesh_boundary_edges": 0,
+            "mesh_nonmanifold_edges": 0,
+            "step_read_back": False,
+            "step_valid": False,
+            "step_solids": 0,
+            "step_skipped": f"Plate is split into {tiled['tiles']} tiles to fit the {config.bed_mm:g} mm bed; "
+                            "STEP is not produced for tiled plates. Use the full SVG in CAD.",
+            "files": [svg_path.name, *tiled["files"]],
+        }
+    vertices, triangles = build_closed_mesh(layer, config)
     stats = _mesh_stats(vertices, triangles)
     if stats["mesh_boundary_edges"] or stats["mesh_nonmanifold_edges"]:
         raise RuntimeError(f"exported mesh is not closed: {stats}")
@@ -459,7 +531,10 @@ def export_meshes(result: AnalysisResult, raw_config: PlateConfig | dict) -> lis
     names = []
     for layer in result.layers:
         stem = f"{config.title}_{layer.name}"
-        vertices, triangles = build_plate_mesh(layer, config)
+        if len(plan_tiles(config)) > 1:
+            names.extend(write_tile_meshes(layer, config, result.directory, stem)["files"])
+            continue
+        vertices, triangles = build_closed_mesh(layer, config)
         for suffix, writer in ((".3mf", _write_3mf), (".stl", write_binary_stl)):
             final = result.directory / f"{stem}{suffix}"
             temporary = result.directory / f".{stem}{suffix}.tmp"

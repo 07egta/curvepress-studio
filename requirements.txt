@@ -4,6 +4,4 @@ Pillow>=10.2,<13
 contourpy>=1.2,<2
 mapbox_earcut>=1.0,<3
 cadquery-ocp==7.8.1.1
-
-
-
+shapely>=2.1,<3
