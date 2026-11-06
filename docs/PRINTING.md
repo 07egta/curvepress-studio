@@ -1,5 +1,23 @@
 # Printing and Test-Print Guide
 
+## Print the nozzle strip first
+
+CurvePress can draw lines thinner than a 0.4 mm nozzle will actually hold. Before an artwork plate, print the test strip and read the result:
+
+```bash
+curvepress calibrate -o output/nozzle-test
+```
+
+Open `output/nozzle-test/nozzle_test_ink.3mf` (or the `.stl`) in the slicer. The file is **not mirrored** — the embossed numbers should read correctly on the plastic. Do not mirror it again. `CALIBRATION.md` in that folder is the score sheet.
+
+- Raised lines, top to bottom: 0.40, 0.50, 0.60, 0.80, 1.00, 1.20, 1.60 mm.
+- Grooves, left to right: the same sizes except 1.60 mm.
+- Bottom left is a solid ink pad. Bottom right is a frame with a hole.
+
+The thinnest line that stays solid is your minimum line width. In the Studio, open **More settings** and set **Min. line width** to that number (or pass `--min-width` on the CLI), then make the artwork plate again. A groove that fills in will fill in on the artwork too.
+
+Use the same nozzle, layer height, base and relief as the artwork plate. The Studio button **Download a nozzle test strip** uses the values currently on screen.
+
 ## Starting point: Bambu A1 mini / 0.4 mm nozzle
 
 | Setting | Recommendation |

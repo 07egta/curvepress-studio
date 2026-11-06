@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 
+from .calibrate import calibration_config_from_request, write_calibration
 from .config import PlateConfig, STYLES
-from .exporter import CadUnavailable, export_analysis
+from .exporter import CadUnavailable, cad_available, export_analysis, export_meshes
 from .pipeline import analyze_image
 
 
@@ -27,7 +29,23 @@ def _config_from_args(args: argparse.Namespace) -> PlateConfig:
         halftone_pitch_mm=args.dot_pitch,
         remove_scan_frame=not args.keep_scan_frame,
         trap_mm=args.trap,
+        minimum_width_mm=args.min_width,
     ).resolved()
+
+
+def _step_failure(exc: BaseException) -> bool:
+    """True when STEP/CAD failed after the printable mesh was already valid."""
+    current: BaseException | None = exc
+    seen: set[int] = set()
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        if isinstance(current, CadUnavailable):
+            return True
+        text = str(current)
+        if "OpenCascade is not installed" in text or text.startswith("STEP export failed"):
+            return True
+        current = current.__cause__ or current.__context__
+    return False
 
 
 def convert_command(args: argparse.Namespace) -> int:
@@ -36,17 +54,60 @@ def convert_command(args: argparse.Namespace) -> int:
     config = _config_from_args(args)
     result = analyze_image(Path(args.image).read_bytes(), config, output)
     reports: list[dict] = []
+    step_warning = None
     if not args.svg_only:
-        try:
-            reports = export_analysis(result, config)
-        except CadUnavailable as exc:
-            raise SystemExit(f"{exc}\nUse --svg-only if you do not need STEP/3MF/STL.") from exc
+        if cad_available():
+            try:
+                reports = export_analysis(result, config)
+            except Exception as exc:
+                if not _step_failure(exc):
+                    raise
+                export_meshes(result, config)
+                step_warning = (
+                    f"STEP was not written ({exc}). 3MF and STL were still written; "
+                    "those are the files to slice."
+                )
+        else:
+            export_meshes(result, config)
+            step_warning = (
+                "OpenCascade is not installed, so STEP was not written. "
+                "3MF and STL are in the output folder and are what the slicer needs. "
+                "Install the CAD extra for STEP: pip install -e '.[cad]'"
+            )
     summary = {
         "job": result.job_id,
         "directory": str(result.directory),
         "warnings": result.warnings,
+        "step_warning": step_warning,
         "metrics": result.metrics,
         "exports": reports,
+        "meshes": sorted(path.name for path in result.directory.glob("*.stl")),
+    }
+    if step_warning:
+        print(step_warning, file=sys.stderr)
+    print(json.dumps(summary, ensure_ascii=False, indent=2))
+    return 0
+
+
+def calibrate_command(args: argparse.Namespace) -> int:
+    output = Path(args.output).resolve()
+    config = calibration_config_from_request(
+        {
+            "nozzle_mm": args.nozzle,
+            "layer_height_mm": args.layer_height,
+            "base_height_mm": args.base,
+            "relief_height_mm": args.relief,
+        }
+    )
+    written = write_calibration(output, config)
+    summary = {
+        "directory": str(output),
+        "files": written["files"],
+        "bounds_mm": written["bounds_mm"],
+        "bars_mm": written["bars_mm"],
+        "gaps_mm": written["gaps_mm"],
+        "mesh": written["mesh"],
+        "note": "Not mirrored. Open CALIBRATION.md, then slice the 3MF or STL.",
     }
     print(json.dumps(summary, ensure_ascii=False, indent=2))
     return 0
@@ -84,8 +145,17 @@ def build_parser() -> argparse.ArgumentParser:
     convert.add_argument("--no-mirror", action="store_true")
     convert.add_argument("--svg-only", action="store_true")
     convert.add_argument("--dot-pitch", type=float, default=1.7, help="halftone dot spacing in mm")
+    convert.add_argument("--min-width", type=float, default=None, help="minimum raised line width in mm (default: from the nozzle)")
     convert.add_argument("--keep-scan-frame", action="store_true", help="preserve the full source image edges")
     convert.set_defaults(func=convert_command)
+
+    calibrate = sub.add_parser("calibrate", help="write a nozzle test strip (STL, 3MF, SVG)")
+    calibrate.add_argument("-o", "--output", default="curvepress-output/nozzle-test")
+    calibrate.add_argument("--nozzle", type=float, default=0.40)
+    calibrate.add_argument("--layer-height", type=float, default=0.20)
+    calibrate.add_argument("--base", type=float)
+    calibrate.add_argument("--relief", type=float)
+    calibrate.set_defaults(func=calibrate_command)
 
     server = sub.add_parser("serve", help="open the local CurvePress Studio UI")
     server.add_argument("--host", default="127.0.0.1")

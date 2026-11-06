@@ -7,7 +7,6 @@ import threading
 import traceback
 import webbrowser
 import zipfile
-import importlib.util
 import hashlib
 import uuid
 from collections import OrderedDict
@@ -17,7 +16,8 @@ from urllib.parse import unquote, urlparse
 
 from . import __version__
 from .config import PlateConfig
-from .exporter import export_analysis, export_meshes
+from .calibrate import calibration_config_from_request, calibration_zip
+from .exporter import cad_available, export_analysis, export_meshes
 from .models import AnalysisResult
 from .pipeline import analyze_image, write_proof
 
@@ -188,7 +188,7 @@ class CurvePressHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:  # noqa: N802
         path = unquote(urlparse(self.path).path)
         if path == "/api/health":
-            self._json(200, {"ok": True, "version": __version__, "cad_available": importlib.util.find_spec("OCP") is not None})
+            self._json(200, {"ok": True, "version": __version__, "cad_available": cad_available()})
             return
         if path.startswith("/api/export/"):
             job_id = path.rsplit("/", 1)[-1]
@@ -264,6 +264,11 @@ class CurvePressHandler(BaseHTTPRequestHandler):
                     FINISHED[result.job_id] = done
                 threading.Thread(target=_finish_job, args=(result, config, done), daemon=True).start()
                 self._json(200, {**_analysis_payload(result), "image_id": image_id})
+                return
+            if path == "/api/calibrate":
+                raw = payload.get("config", {})
+                blob = calibration_zip(calibration_config_from_request(raw if isinstance(raw, dict) else {}))
+                self._send(200, blob, "application/zip")
                 return
             if path == "/api/export":
                 job_id = str(payload.get("job_id", ""))

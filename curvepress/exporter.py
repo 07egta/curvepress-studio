@@ -19,6 +19,29 @@ class CadUnavailable(RuntimeError):
     pass
 
 
+def cad_available() -> bool:
+    """True when the OpenCascade bindings can be imported."""
+    import importlib.util
+
+    return importlib.util.find_spec("OCP") is not None
+
+
+def _checked_plate_mesh(layer: PlateLayer, config: PlateConfig):
+    """Mesh one plate and reject an open shell or a drifted bounding box."""
+    vertices, triangles = build_plate_mesh(layer, config)
+    stats = _mesh_stats(vertices, triangles)
+    if stats["mesh_boundary_edges"] or stats["mesh_nonmanifold_edges"]:
+        raise RuntimeError(f"exported mesh is not closed: {stats}")
+    bounds = (vertices.max(axis=0) - vertices.min(axis=0)).astype(float)
+    expected = np.array(
+        [config.width_mm, config.height_mm, config.base_height_mm + config.relief_height_mm],
+        dtype=float,
+    )
+    if np.any(np.abs(bounds - expected) > 0.02):
+        raise RuntimeError(f"mesh dimensions drifted: {bounds.tolist()} vs {expected.tolist()}")
+    return vertices, triangles, stats, bounds
+
+
 STEP_REGION_LIMIT = 1600
 
 
@@ -409,14 +432,9 @@ def export_layer(layer: PlateLayer, config: PlateConfig, directory: Path) -> dic
     svg_path = directory / f"{stem}.svg"
     svg_path.write_text(layer.svg, encoding="utf-8")
 
-    vertices, triangles = build_plate_mesh(layer, config)
-    stats = _mesh_stats(vertices, triangles)
-    if stats["mesh_boundary_edges"] or stats["mesh_nonmanifold_edges"]:
-        raise RuntimeError(f"exported mesh is not closed: {stats}")
-    bounds = (vertices.max(axis=0) - vertices.min(axis=0)).astype(float).tolist()
+    vertices, triangles, stats, bounds_array = _checked_plate_mesh(layer, config)
+    bounds = bounds_array.tolist()
     expected = [config.width_mm, config.height_mm, config.base_height_mm + config.relief_height_mm]
-    if any(abs(a - b) > 0.02 for a, b in zip(bounds, expected)):
-        raise RuntimeError(f"mesh dimensions drifted: {bounds} vs {expected}")
     volume = mesh_volume(vertices, triangles)
     stl_path = directory / f"{stem}.stl"
     write_binary_stl(stl_path, vertices, triangles)
@@ -459,7 +477,7 @@ def export_meshes(result: AnalysisResult, raw_config: PlateConfig | dict) -> lis
     names = []
     for layer in result.layers:
         stem = f"{config.title}_{layer.name}"
-        vertices, triangles = build_plate_mesh(layer, config)
+        vertices, triangles, _, _ = _checked_plate_mesh(layer, config)
         for suffix, writer in ((".3mf", _write_3mf), (".stl", write_binary_stl)):
             final = result.directory / f"{stem}{suffix}"
             temporary = result.directory / f".{stem}{suffix}.tmp"

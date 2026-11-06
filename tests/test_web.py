@@ -129,6 +129,21 @@ class WebTests(unittest.TestCase):
             self.assertEqual(status, 200, key)
             self.assertGreater(len(body), 200)
 
+    def test_health_and_calibration_zip(self):
+        status, body = self.request('/api/health')
+        self.assertEqual(status, 200)
+        health = json.loads(body)
+        self.assertIn('cad_available', health)
+        status, archive = self.request('/api/calibrate', {'config': {'nozzle_mm': 0.4, 'layer_height_mm': 0.16}})
+        self.assertEqual(status, 200, archive[:120])
+        with zipfile.ZipFile(io.BytesIO(archive)) as bundle:
+            names = bundle.namelist()
+            guide = bundle.read('CALIBRATION.md').decode('utf-8')
+        self.assertIn('nozzle_test_ink.stl', names)
+        self.assertIn('nozzle_test_ink.3mf', names)
+        self.assertIn('0.16', guide)
+        self.assertEqual(self.request('/api/calibrate', {'config': {'nozzle_mm': 9}})[0], 400)
+
     def test_unknown_image_id_asks_for_upload(self):
         status, body = self.request('/api/analyze', {'image_id': 'nope', 'config': {'style': 'poster'}})
         self.assertEqual(status, 409)

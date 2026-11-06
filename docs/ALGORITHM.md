@@ -7,7 +7,7 @@ CurvePress does not try to redraw an image artistically. It preserves the source
 1. Apply EXIF rotation, composite transparency over white, and fit the image to the plate while preserving its aspect ratio.
 2. Correct paper color and white balance, remove low-frequency lighting variation, and enhance local contrast.
 3. Apply style-specific color separation and thresholding.
-4. Remove only known image-placement borders, then remove nozzle-sized islands, fill tiny holes, and thicken lines only as needed for printability.
+4. Remove only known image-placement borders, then remove nozzle-sized islands, fill tiny holes, close gaps narrower than the minimum gap (except halftone dots), and thicken only strokes that are thinner than the minimum line width. Large solids are not inflated, and a gap that already meets the minimum is not sealed.
 5. Extract the 0.5 contour and simplify it within tolerance using Ramer–Douglas–Peucker.
 6. Convert the contour to a self-intersection-resistant cubic Bézier sequence with rounded corners inside local triangles.
 7. Write SVG and convert the same curves into exact cubic B-spline edges before extruding with OpenCascade.
@@ -56,7 +56,7 @@ These are conservative starting rules that keep slicer-impossible details out of
 | Line art | Local Sauvola threshold | Pen drawings, lettering, logos |
 | Photo halftone | 15° circular dots with density-based diameter | Photos, shading |
 | Poster | Strong Otsu two-tone threshold | Silhouettes, icons |
-| Color separation | 2–6 colors with median-cut | Multicolor plates, posters |
+| Color separation | 2–6 ink colours by Lab k-means, paper left uninked | Multicolor plates, posters |
 
 ## Deliberately not done
 

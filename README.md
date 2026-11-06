@@ -46,6 +46,12 @@ flowchart LR
     E --> F[Print & test]
 ```
 
+## New in 0.3.2 — a plate you can slice without CAD
+
+- **3MF and STL always.** `curvepress convert` writes them even when OpenCascade is not installed. STEP is still checked when the CAD extra is present, and a STEP failure no longer throws away the mesh.
+- **Minimum line width is real.** Hairlines thinner than the nozzle rule are thickened. Gaps that already meet the minimum stay open. Halftone dots are left alone. Set **Min. line width** after a test print.
+- **Nozzle test strip.** `curvepress calibrate` (or **Download a nozzle test strip** in the Studio) writes an unmirrored 120 × 96 mm plate with 0.4–1.6 mm lines and grooves, plus `CALIBRATION.md`.
+
 ## New in 0.3.1 — no more white gaps
 
 - **Trapping**: in colour-plate mode lighter inks are spread a hair under the darker ones (default 0.20 mm), so small misregistration no longer leaves bare paper between colours.
@@ -86,7 +92,7 @@ flowchart LR
 
 ## Quick start
 
-Python 3.11 or newer is required. 3MF, STL and SVG work out of the box; the CAD extra adds STEP export.
+Python 3.11 or newer is required. SVG, 3MF and STL work out of the box, from the Studio and from `curvepress convert`. The CAD extra adds STEP. `--svg-only` skips the meshes when you only want a preview.
 
 ```bash
 git clone https://github.com/07egta/curvepress-studio.git
@@ -112,7 +118,7 @@ curvepress serve
 
 Open <http://127.0.0.1:8765> and choose an image (or paste one). The plate updates by itself as you change the style or size; save 3MF/STL/SVG right away, and click **Also make STEP** only if you need CAD.
 
-For a source checkout without the CAD dependency, use `pip install -e .` and add `--svg-only` to a CLI conversion.
+For a source checkout without the CAD dependency, use `pip install -e .`. Convert still writes 3MF and STL. Add `--svg-only` when you do not want a mesh.
 
 ## The five styles
 
@@ -144,11 +150,11 @@ python -m venv .venv
 
 ```powershell
 .venv\Scripts\Activate.ps1
-pip install -e ".[cad]"
-curvepress convert examples/hokusai-great-wave.jpg --style woodcut --width 139 --height 83 --svg-only -o output/hokusai
+pip install -e .
+curvepress convert examples/hokusai-great-wave.jpg --style woodcut --width 139 --height 83 -o output/hokusai
 ```
 
-Open `output/hokusai/` to see the curve-based SVG. For the visual workflow, run `curvepress serve`, click **Hokusai sample**, and compare **Woodcut**, **Poster**, and **Color separation** without selecting a file.
+Open `output/hokusai/` and slice the `.3mf` (the `.stl` is the same plate). Install `.[cad]` only when you also want STEP. For the visual workflow, run `curvepress serve`, click **Hokusai sample**, and compare **Woodcut**, **Poster**, and **Color separation** without selecting a file.
 
 ## CLI examples
 
@@ -162,7 +168,15 @@ The command prints a JSON summary containing the job directory, warnings, metric
 
 ## Print starting point
 
-For a Bambu A1 mini with a 0.4 mm nozzle, start with PLA, 0.20 mm layer height, Arachne wall generation, four walls, five top layers, no supports, and top-surface ironing. CurvePress defaults to a 0.8 mm base, 1.2 mm relief, and 2.0 mm total height for this nozzle size.
+Print the nozzle strip before an artwork plate. It tells you which line width and which white gap this printer can hold.
+
+```bash
+curvepress calibrate -o output/nozzle-test
+```
+
+Slice `output/nozzle-test/nozzle_test_ink.3mf` (STL is the same shape). The strip is not mirrored: the numbers should read correctly on the plastic, so do not mirror it in the slicer. Then set **Min. line width** (or `--min-width`) to the thinnest line that stayed solid, and export the artwork. Details and a score sheet are in [the printing guide](docs/PRINTING.md) and in `CALIBRATION.md` next to the mesh.
+
+For a Bambu A1 mini with a 0.4 mm nozzle, start with PLA, 0.20 mm layer height, Arachne wall generation, four walls, five top layers, no supports, and top-surface ironing. CurvePress defaults to a 0.8 mm base, 1.2 mm relief, and 2.0 mm total height for this nozzle size. Artwork plates are mirrored for stamping; the test strip is not.
 
 Raised artwork receives ink; low areas remain the paper color. Physical results depend on the paper, ink, roller, flatness, and pressure, so begin with a small test print. See the [printing guide](docs/PRINTING.md).
 
@@ -211,6 +225,12 @@ CurvePress Studioは、写真・スキャン・ロゴ・線画を、FDM方式の
 
 画像は自分のPC上で処理され、クラウドの画像サービスへ送信されません。
 
+### 0.3.2の新機能 — CADがなくても刷れる
+
+- **3MF/STLは必ず出ます。** OpenCascadeが無くても `curvepress convert` はメッシュを書きます。STEPの失敗でメッシュが消えることもありません。
+- **最小線幅が実際に効きます。** ノズルより細い線は太くし、十分な白い隙間は残します。網点はつなぎません。
+- **ノズル確認用の試し版。** `curvepress calibrate`、または画面の「ノズル確認用の試し版を保存」。120×96 mm、反転なし。
+
 ### 0.3.1の新機能 — 白い隙間を出にくく
 
 - **トラッピング（のせ）**：色分けで、明るい色を暗い色の下へ少し広げます（既定0.20 mm）。見当が少しズレても色の間に紙が見えにくくなります。
@@ -245,6 +265,8 @@ CurvePress Studioは、写真・スキャン・ロゴ・線画を、FDM方式の
 
 Python 3.11以上を用意し、上の **Quick start** の手順で起動してください。ブラウザーで <http://127.0.0.1:8765> を開き、画像を選ぶ（貼り付けでもOK）だけ。スタイルやサイズを変えると自動で版が更新されます。3MF/STL/SVGはすぐ保存でき、CAD用のSTEPはボタンで作れます。
 
+最初の印刷はノズル確認用の試し版です。`curvepress calibrate -o output/nozzle-test` を実行し、できた `nozzle_test_ink.3mf` をスライスしてください。反転していないので、数字がそのまま読める向きです。残ったいちばん細い線を「最小の線幅」に入れてから作品の版を作ります。CADが無くても3MF/STLは出ます。
+
 詳しい印刷条件は[印刷ガイド](docs/PRINTING.md)、処理の考え方は[アルゴリズムの説明](docs/ALGORITHM.md)を参照してください。
 
 ### 開発への参加
@@ -255,7 +277,7 @@ Python 3.11以上を用意し、上の **Quick start** の手順で起動して�
 
 CurvePress Studio 可以把照片、扫描件、线稿和海报转换成适合FDM 3D打印的浮雕版。图像在本地处理，不会上传到云端图像服务。
 
-从 `examples/` 中选择葛饰北斋、蒙娜丽莎或《星月夜》，在网页界面点击 **Hokusai sample** 或对应的示例卡片，然后比较木刻、照片半色调和颜色分离效果。最后可以导出 SVG、STEP、3MF 和 STL。
+从 `examples/` 中的葛饰北斋《神奈川冲浪里》开始，在网页界面点击 **北斋《神奈川冲浪里》**，比较木刻、海报和分色效果，然后导出 SVG、3MF 和 STL。没有 CAD 扩展时也可以导出 3MF/STL。打印作品版之前，先在界面下载喷嘴测试条，或运行 `curvepress calibrate`。测试条不要镜像。
 
 **0.2 新功能：** 和纸印刷效果预览、可旋转的 3D 版面、多色版自动添加日本木版传统的规矩（套准标记）、按原画真实颜色分色。
 

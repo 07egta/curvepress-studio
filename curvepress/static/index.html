@@ -114,6 +114,9 @@ details[open] summary::before{transform:rotate(45deg)}
 .primary{width:100%;border:0;border-radius:var(--radius-m);background:var(--ai);color:#fff;padding:11px 14px;font-weight:600;font-size:14px;display:flex;justify-content:center;align-items:center;gap:8px}
 @media (prefers-color-scheme:dark){.primary{color:#0f1d31}}
 .primary:disabled{opacity:.45;cursor:default}
+.ghost{width:100%;margin:0 0 8px;border:1px solid var(--line);border-radius:var(--radius-m);background:transparent;padding:9px 14px;font-weight:600;font-size:13.5px}
+.ghost:hover{border-color:var(--ai);color:var(--ai)}
+.ghost:disabled{opacity:.45;cursor:default}
 .hint{font-size:12px;color:var(--muted);margin:6px 0 0}
 .empty-note{font-size:13px;color:var(--muted);margin:0}
 
@@ -240,6 +243,7 @@ main{display:grid;grid-template-rows:auto 1fr auto;min-width:0;min-height:0;back
             <label class="field"><span data-t="layer"></span><select id="layer"><option>0.12</option><option>0.16</option><option selected>0.20</option><option>0.24</option><option>0.28</option></select></label>
             <label class="field"><span data-t="base"></span><input id="base" placeholder="auto" inputmode="decimal"></label>
             <label class="field"><span data-t="relief"></span><input id="relief" placeholder="auto" inputmode="decimal"></label>
+            <label class="field"><span data-t="minWidth"></span><input id="minWidth" placeholder="auto" inputmode="decimal"></label>
           </div>
           <div class="range"><label for="detail" data-t="detail"></label><output id="detailOut"></output><input id="detail" type="range" min="0" max="100" value="68"></div>
           <div class="range"><label for="contrast" data-t="contrast"></label><output id="contrastOut"></output><input id="contrast" type="range" min="0" max="100" value="55"></div>
@@ -254,6 +258,8 @@ main{display:grid;grid-template-rows:auto 1fr auto;min-width:0;min-height:0;back
    <div class="savebar">
     <section class="step">
       <h2><b>4</b><span data-t="s4"></span></h2>
+      <button class="ghost" id="calibrate" type="button" data-t="calibrate"></button>
+      <p class="hint" id="calibrateHint" data-t="calibrateHint"></p>
       <p class="empty-note" id="filesEmpty" data-t="filesEmpty"></p>
       <div class="files hidden" id="files"></div>
       <div class="sub hidden" id="stepBox">
@@ -303,7 +309,7 @@ ja:{tagline:'画像から、刷れる版へ',local:'この端末の中だけで�
  s2:'スタイル',woodcut:'木版画',woodcutHint:'面と輪郭',lineArt:'線画',lineArtHint:'細い線を残す',halftone:'写真網点',halftoneHint:'写真を丸い点で',poster:'ポスター',posterHint:'くっきり2階調',color:'色分け（多色刷り）',colorHint:'原画の色ごとに版を分け、見当を付けます',colors:'色の数',pitch:'網点の間隔',
  s3:'版の大きさ',mm:'単位 mm',width:'幅',height:'高さ',swap:'縦横を入れ替え',sizeDefault:'139×83',sizePostcard:'はがき',sizeCard:'名刺',sizeSquare:'正方形',sizeBed:'180角',thick:'厚み {t} mm（土台 {b} + 凸 {r}）',
  more:'細かい設定',nozzle:'ノズル径',layer:'積層ピッチ',base:'土台の厚み',relief:'凸の高さ',detail:'細部',contrast:'コントラスト',mirror:'版を左右反転する（刷ると正しい向き）',kento:'多色刷りに見当を付ける',frame:'スキャンの枠を取り除く',invert:'白黒を反転',
- s4:'保存',filesEmpty:'画像を選ぶと、ここに保存ボタンが出ます。',zip:'まとめてZIP',makeStep:'STEP（CAD用）も作る',stepHint:'Fusion や Rhino で編集するとき用。数十秒かかります。',stepBusy:'STEPを作っています…',stepDone:'STEPを作りました（読み直して形を確認済み）',stepSkip:'{p}: 点が多すぎるためSTEPは作りません（3MF/STLは大丈夫）',
+ s4:'保存',filesEmpty:'画像を選ぶと、ここに保存ボタンが出ます。',zip:'まとめてZIP',makeStep:'STEP（CAD用）も作る',stepHint:'Fusion や Rhino で編集するとき用。数十秒かかります。',stepNoCad:'印刷には3MF/STLを使ってください。STEPには追加のCADが必要です（pip install -e ".[cad]"）。',stepBusy:'STEPを作っています…',stepDone:'STEPを作りました（読み直して形を確認済み）',stepSkip:'{p}: 点が多すぎるためSTEPは作りません（3MF/STLは大丈夫）',calibrate:'ノズル確認用の試し版を保存',calibrateHint:'作品の前に印刷します。数字はミリで、版の上で正しい向きです。反転しないでください。',minWidth:'最小の線幅',
  vCompare:'見比べる',vPlate:'版を回す',vCurves:'凸になる所',vCorrected:'補正後',left:'原画',right:'刷り上がり',
  welcomeTitle:'画像を、刷れる版に。',welcomeText:'左で画像を選ぶと、版と刷り上がりがここに出ます。3Dプリンターで印刷して、インクを付けて紙に刷れます。',
  loading:'画像を読み込んでいます…',working:'版を作っています…',ready:'できました',failed:'うまくいきませんでした: {m}',tooLarge:'30MB以下の画像にしてください',notImage:'画像として読み込めませんでした',
@@ -314,7 +320,7 @@ en:{tagline:'From an image to a plate you can print with',local:'Everything stay
  s2:'Style',woodcut:'Woodcut',woodcutHint:'Shapes and contours',lineArt:'Line art',lineArtHint:'Keeps fine lines',halftone:'Halftone',halftoneHint:'Photos as round dots',poster:'Poster',posterHint:'Crisp two-tone',color:'Colour plates',colorHint:'One plate per colour in the artwork, with registration marks',colors:'Colours',pitch:'Dot spacing',
  s3:'Plate size',mm:'in mm',width:'Width',height:'Height',swap:'Swap width and height',sizeDefault:'139×83',sizePostcard:'Postcard',sizeCard:'Card',sizeSquare:'Square',sizeBed:'180 sq.',thick:'{t} mm thick (base {b} + relief {r})',
  more:'More settings',nozzle:'Nozzle',layer:'Layer height',base:'Base thickness',relief:'Relief height',detail:'Detail',contrast:'Contrast',mirror:'Mirror the plate (prints the right way round)',kento:'Add registration marks to colour plates',frame:'Remove scan frames',invert:'Invert black and white',
- s4:'Save',filesEmpty:'Choose an image and the download buttons appear here.',zip:'Everything as ZIP',makeStep:'Also make STEP (for CAD)',stepHint:'For editing in Fusion or Rhino. Takes a few tens of seconds.',stepBusy:'Making STEP…',stepDone:'STEP ready (read back and checked)',stepSkip:'{p}: too many dots for STEP (3MF/STL are fine)',
+ s4:'Save',filesEmpty:'Choose an image and the download buttons appear here.',zip:'Everything as ZIP',makeStep:'Also make STEP (for CAD)',stepHint:'For editing in Fusion or Rhino. Takes a few tens of seconds.',stepNoCad:'Slice the 3MF or STL. STEP needs the CAD extra: pip install -e ".[cad]".',stepBusy:'Making STEP…',stepDone:'STEP ready (read back and checked)',stepSkip:'{p}: too many dots for STEP (3MF/STL are fine)',calibrate:'Download a nozzle test strip',calibrateHint:'Print this before an artwork plate. Numbers are millimetres and read correctly on the plastic — do not mirror it.',minWidth:'Min. line width',
  vCompare:'Compare',vPlate:'Plate in 3D',vCurves:'Raised areas',vCorrected:'Corrected',left:'Original',right:'Print',
  welcomeTitle:'Turn an image into a printing plate.',welcomeText:'Choose an image on the left and the plate and its print appear here. 3D-print the plate, ink it, and press it onto paper.',
  loading:'Loading image…',working:'Making the plate…',ready:'Done',failed:'That didn’t work: {m}',tooLarge:'Use an image under 30 MB',notImage:'This file couldn’t be read as an image',
@@ -325,7 +331,7 @@ zh:{tagline:'从图像到可以印刷的版',local:'全部在本机处理',s1:'�
  s2:'风格',woodcut:'木刻',woodcutHint:'形状与轮廓',lineArt:'线稿',lineArtHint:'保留细线',halftone:'照片网点',halftoneHint:'用圆点表现照片',poster:'海报',posterHint:'清晰双色',color:'分色套印',colorHint:'按原画颜色分版，并加规矩',colors:'颜色数',pitch:'网点间距',
  s3:'版的尺寸',mm:'单位 mm',width:'宽',height:'高',swap:'交换宽高',sizeDefault:'139×83',sizePostcard:'明信片',sizeCard:'名片',sizeSquare:'正方形',sizeBed:'180见方',thick:'厚 {t} mm（底座 {b} + 凸起 {r}）',
  more:'更多设置',nozzle:'喷嘴',layer:'层高',base:'底座厚度',relief:'凸起高度',detail:'细节',contrast:'对比度',mirror:'版面左右镜像（印出来方向正确）',kento:'为分色版添加规矩',frame:'去除扫描边框',invert:'黑白反转',
- s4:'保存',filesEmpty:'选择图像后，这里会出现下载按钮。',zip:'全部打包 ZIP',makeStep:'同时生成 STEP（CAD 用）',stepHint:'用于在 Fusion 或 Rhino 中编辑，需要几十秒。',stepBusy:'正在生成 STEP…',stepDone:'STEP 已生成（已重新读取并检查）',stepSkip:'{p}：网点过多，不生成 STEP（3MF/STL 可用）',
+ s4:'保存',filesEmpty:'选择图像后，这里会出现下载按钮。',zip:'全部打包 ZIP',makeStep:'同时生成 STEP（CAD 用）',stepHint:'用于在 Fusion 或 Rhino 中编辑，需要几十秒。',stepNoCad:'切片请用 3MF 或 STL。STEP 需要 CAD 扩展：pip install -e ".[cad]"。',stepBusy:'正在生成 STEP…',stepDone:'STEP 已生成（已重新读取并检查）',stepSkip:'{p}：网点过多，不生成 STEP（3MF/STL 可用）',calibrate:'下载喷嘴测试条',calibrateHint:'先打印这个再做作品版。数字单位是毫米，在打印件上正向可读，不要镜像。',minWidth:'最小线宽',
  vCompare:'对比',vPlate:'3D 版',vCurves:'凸起部分',vCorrected:'校正后',left:'原图',right:'印刷效果',
  welcomeTitle:'把图像变成可以印刷的版。',welcomeText:'在左侧选择图像，版和印刷效果会显示在这里。用 3D 打印机打印出版，上墨后压印到纸上。',
  loading:'正在读取图像…',working:'正在制作版…',ready:'完成',failed:'没有成功：{m}',tooLarge:'请使用 30MB 以内的图像',notImage:'无法作为图像读取',
@@ -355,6 +361,7 @@ const num=(id)=>Number($('#'+id).value);
 function config(){return{style:S.style,width_mm:num('width'),height_mm:num('height'),nozzle_mm:num('nozzle'),layer_height_mm:num('layer'),
   base_height_mm:$('#base').value.trim()?Number($('#base').value):null,relief_height_mm:$('#relief').value.trim()?Number($('#relief').value):null,
   detail:num('detail')/100,contrast:num('contrast')/100,color_count:num('colors'),trap_mm:num('trap'),halftone_pitch_mm:num('pitch'),
+  minimum_width_mm:$('#minWidth').value.trim()?Number($('#minWidth').value):null,
   halftone_max_dot_mm:Math.min(1.6,num('pitch')*0.94),mirror_for_print:$('#mirror').checked,registration_marks:$('#kento').checked,
   remove_scan_frame:$('#frame').checked,invert:$('#invert').checked,title:(S.fileName||'curvepress_plate').replace(/\.[^.]+$/,'')}}
 function auto(){const n=num('nozzle'),l=num('layer'),r=v=>Math.max(l,Math.round(v/l)*l);
@@ -413,7 +420,7 @@ $$('#styles .style').forEach(b=>b.addEventListener('click',()=>{S.style=b.datase
 $('#styles').addEventListener('keydown',e=>{const k=['ArrowRight','ArrowDown','ArrowLeft','ArrowUp'].indexOf(e.key);if(k<0)return;e.preventDefault();
   const list=$$('#styles .style'),i=list.findIndex(b=>b.dataset.style===S.style),n=list[(i+(k<2?1:-1)+list.length)%list.length];S.style=n.dataset.style;n.focus();schedule()});
 ['colors','trap','pitch','detail','contrast'].forEach(id=>$('#'+id).addEventListener('input',()=>{renderOutputs();schedule()}));
-['width','height','base','relief'].forEach(id=>$('#'+id).addEventListener('input',()=>{const w=num('width'),h=num('height');if(w>=20&&w<=256&&h>=20&&h<=256)schedule();else renderThickness()}));
+['width','height','base','relief','minWidth'].forEach(id=>$('#'+id).addEventListener('input',()=>{const w=num('width'),h=num('height');if(w>=20&&w<=256&&h>=20&&h<=256)schedule();else renderThickness()}));
 ['nozzle','layer','mirror','kento','frame','invert'].forEach(id=>$('#'+id).addEventListener('change',schedule));
 $('#swap').addEventListener('click',()=>{const w=$('#width').value;$('#width').value=$('#height').value;$('#height').value=w;schedule()});
 $$('#sizes button').forEach(b=>b.addEventListener('click',()=>{$('#width').value=b.dataset.w;$('#height').value=b.dataset.h;schedule()}));
@@ -425,14 +432,20 @@ function renderFiles(){const d=S.data;if(!d)return;$('#filesEmpty').classList.ad
   const multi=d.layers.length>1;
   box.innerHTML=d.layers.map((l,i)=>`<div class="plate-row"><span class="swatch" style="background:${multi?l.color:'var(--ai)'}"></span><span class="name">${multi?`${t('fPlate')} ${i+1}`:t('fPlate')}</span><div class="links">${link(l['3mf'],'3MF')}${link(l.stl,'STL')}${link(l.svg,'SVG')}</div></div>`).join('')
    +`<div class="plate-row all"><div class="links">${link(d.bundle,t('zip'))}${link(d.previews.proof,'PNG',`proof-preview.png`)}${d.guide?link(d.guide,t('guide'),'PRINT_GUIDE.md'):''}</div></div>`}
+let cadOk=null;
 function renderStep(){const d=S.data;$('#stepBox').classList.toggle('hidden',!d);if(!d)return;const st=S.step,btn=$('#makeStep');
   const skipped=(d.metrics.notes||[]).filter(n=>n.code==='step_skipped');
+  if(cadOk===false){btn.disabled=true;btn.classList.add('hidden');$('#stepHint').textContent=t('stepNoCad');$('#stepHint').style.color='';$('#stepFiles').innerHTML='';return}
   btn.disabled=!!st&&st.state!=='error';btn.classList.toggle('hidden',!!st&&st.state==='done');btn.innerHTML=st&&st.state==='running'?`<i class="spinner"></i><span>${t('stepBusy')}</span>`:`<span>${t('makeStep')}</span>`;
   $('#stepHint').textContent=st&&st.state==='error'?t('failed',{m:st.message}):st&&st.state==='done'?t('stepDone'):skipped.length?skipped.map(n=>t('stepSkip',{p:n.layer})).join(' / '):t('stepHint');
   $('#stepHint').style.color=st&&st.state==='error'?'var(--beni)':'';
   $('#stepFiles').innerHTML=st&&st.state==='done'?st.files.filter(f=>/\.step$/i.test(f.name)).map(f=>{const m=f.name.match(/_plate_(\d+)\.step$/i);return link(f.url,m?`STEP ${m[1]}`:'STEP')})
     .join(''):'';$('#stepFiles').style.cssText='display:flex;flex-wrap:wrap;gap:6px;margin-top:8px'}
-$('#makeStep').addEventListener('click',async()=>{const d=S.data;if(!d)return;const job=d.job_id;S.step={state:'running'};renderStep();
+$('#calibrate').addEventListener('click',async()=>{const btn=$('#calibrate');btn.disabled=true;
+  try{const r=await post('/api/calibrate',{config:config()});if(!r.ok){const j=await r.json().catch(()=>({}));throw Error(j.error||r.statusText)}
+    const blob=await r.blob(),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='curvepress-nozzle-test.zip';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),4000)}
+  catch(e){setStatus('failed','error',{m:e.message})}finally{btn.disabled=false}});
+$('#makeStep').addEventListener('click',async()=>{const d=S.data;if(!d||cadOk===false)return;const job=d.job_id;S.step={state:'running'};renderStep();
   try{const r=await post('/api/export',{job_id:job});const j=await r.json();if(!r.ok)throw Error(j.error);poll(job)}catch(e){S.step={state:'error',message:e.message};renderStep()}});
 async function poll(job){if(!S.data||S.data.job_id!==job)return;
   try{const r=await fetch('/api/export/'+job),j=await r.json();if(!S.data||S.data.job_id!==job)return;
@@ -536,6 +549,7 @@ function orbit(c){const pts=new Map();let pinch=0;const cam=V3.cam;
 /* ---------- start ---------- */
 $$('[data-lang]').forEach(b=>b.addEventListener('click',()=>applyLang(b.dataset.lang)));
 applyLang(lang);
+fetch('/api/health').then(r=>r.json()).then(d=>{cadOk=!!d.cad_available;if(S.data)renderStep()}).catch(()=>{});
 </script>
 </body>
 </html>
