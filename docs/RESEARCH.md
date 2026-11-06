@@ -11,8 +11,11 @@ What was checked on the web before adding trapping and the print guide, and what
 | Type-high | 0.918 in (about 23.32 mm); printers raise thinner blocks with chipboard/card shims, building up rather than grinding down, and checking with calipers. | [Briar Press: Mounting lino at type height](https://briarpress.org/18316) |
 | Computer-aided woodblock | Vector contours keep line and shape definition intact when producing relief blocks by additive or laser methods. | [UWE Bristol research output](https://uwe-repository.worktribe.com/output/829350/an-exploration-of-alternative-computer-aided-methods-for-multi-colour-woodblock-printing) |
 
+## Adopted in 0.3.2
+
+- A printed resolution strip (`curvepress calibrate`): raised lines and grooves from 0.40 to 1.60 mm, plus a solid pad and an open window, so a first print can set the minimum line width.
+
 ## Not adopted yet
 
 - Reduction-print carve guides (one block, stage-by-stage carving) - useful for hand carving, not needed for separate printed plates.
 - Plate tiling for beds smaller than the artwork.
-- A printed resolution test strip for finding a printer's minimum line width.

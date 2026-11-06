@@ -1,8 +1,8 @@
 # Contributing
 
-CurvePress Studio is an alpha project for turning images into printable relief plates. Small, reproducible reports and focused pull requests are especially useful.
+CurvePress Studio is a beta project for turning images into printable relief plates. Small, reproducible reports and focused pull requests are especially useful.
 
-CurvePress Studioは、画像を印刷可能なレリーフプレートへ変換するアルファ版プロジェクトです。再現手順が明確な不具合報告と、小さく焦点の合った改善提案を歓迎します。
+CurvePress Studioは、画像を印刷可能なレリーフプレートへ変換するベータ版プロジェクトです。再現手順が明確な不具合報告と、小さく焦点の合った改善提案を歓迎します。
 
 ## Before opening an issue / Issueを作る前に
 

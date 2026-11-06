@@ -1,10 +1,16 @@
-CurvePress Studio 0.2.0
+CurvePress Studio 0.3.2
 
 SOURCE CHECKOUT / SOURCE ZIP
   Windows: double-click run_curvepress.bat
   macOS / Linux: sh run_curvepress.command
   Python 3.11+ and network access are needed for dependency installation.
   Both launchers retry an incomplete installation.
+
+FIRST PRINT
+  curvepress calibrate -o output/nozzle-test
+  Slice output/nozzle-test/nozzle_test_ink.3mf (or the .stl).
+  The strip is not mirrored. Read CALIBRATION.md in that folder.
+  3MF and STL do not need the CAD extra. STEP does.
 
 WINDOWS PORTABLE APP
   Download CurvePress-Studio-Windows from a successful "Windows portable app"

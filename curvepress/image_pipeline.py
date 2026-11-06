@@ -320,6 +320,9 @@ def make_masks(
             mask ^ config.invert,
             config,
             content_box,
+            # Halftone dots are allowed to sit closer than the minimum gap.
+            # Closing those gaps would fuse the picture into flat blobs.
+            close_narrow_gaps=config.style != "halftone",
         )
         if np.count_nonzero(cleaned):
             cleaned_layers.append((name, color, cleaned, report))

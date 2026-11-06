@@ -61,7 +61,7 @@ This sequence shows the visual transformation and the practical printability che
 
 ## Keep the claims honest
 
-- The project is alpha software; timings and print results vary by machine, material, image, and pressure.
+- The project is beta software; timings and print results vary by machine, material, image, and pressure.
 - The app processes locally, but the user remains responsible for the privacy and copyright of input images.
 - A successful export is not a guarantee of a successful physical stamp or print.
 - Always read warnings and make a small test print first.

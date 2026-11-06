@@ -4,6 +4,20 @@ All notable changes to CurvePress Studio are documented here.
 
 CurvePress is in beta. Version notes describe the repository state and may not represent a packaged release.
 
+## 0.3.2 — 2026-11-06
+
+### English
+
+- **Minimum line width is enforced.** Strokes thinner than the nozzle rule are thickened, and a gap that is already at the minimum stays open. Halftone dots are not fused. `--min-width` and the Studio field **Min. line width** override the automatic value.
+- **3MF and STL no longer depend on OpenCascade.** `curvepress convert` writes them even when the CAD extra is missing or STEP fails. `--svg-only` still skips the meshes. The Studio hides the STEP button when CAD is not installed.
+- **Nozzle test strip.** `curvepress calibrate` (and **Download a nozzle test strip** in the Studio) writes an unmirrored plate with 0.4–1.6 mm lines and grooves, plus `CALIBRATION.md`. Print that before an artwork plate.
+
+### 日本語
+
+- **最小線幅を実際に守るようにしました。** ノズルより細い線は太くし、すでに最小幅の隙間は埋めません。網点はくっつけません。`--min-width` と画面の「最小の線幅」で上書きできます。
+- **3MF/STLはOpenCascadeなしで出ます。** CADが無い、またはSTEPに失敗しても `curvepress convert` は3MF/STLを書きます。`--svg-only` は今までどおりメッシュを出しません。CADが無いときはSTEPボタンを出さず、3MF/STLを使うよう案内します。
+- **ノズル確認用の試し版。** `curvepress calibrate`（画面の「ノズル確認用の試し版を保存」）が、反転していない 0.4〜1.6 mm の線と溝、および `CALIBRATION.md` を書き出します。作品の版の前に印刷してください。
+
 ## 0.3.1 — 2026-11-05
 
 ### English

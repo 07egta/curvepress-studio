@@ -1,3 +1,9 @@
+# Verification
+
+## 0.3.2
+
+`pytest` covers three print-path fixes: a one-pixel stroke is thickened to the minimum line width without closing a gap that already meets the minimum; `curvepress convert` writes STL and 3MF when OpenCascade is missing and when STEP generation raises; `curvepress calibrate` writes a closed 120 × 96 mm mesh whose 0.40 mm bar measures 0.40 mm. These checks do not replace printing the strip on a machine.
+
 # Version 0.2.0 verification
 
 Verified in the development environment on 2026-10-31 with Python 3.12 and OpenCascade 7.8.1.1. These checks do not replace an actual ink-and-paper test print.

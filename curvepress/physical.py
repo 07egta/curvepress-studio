@@ -66,10 +66,88 @@ def _fill_tiny_holes(mask: np.ndarray, config: PlateConfig) -> np.ndarray:
     return mask | fill[labels]
 
 
+def _stroke_radius_px(width_mm: float, ppm: float) -> float:
+    """Medial distance-transform value for a stroke ``width_mm`` wide.
+
+    A one-pixel stroke has EDT 1 and a geometric width of one pixel, because
+    the cell boundary sits halfway to the next pixel. A stroke of N pixels
+    therefore has medial EDT ``N/2 + 0.5``.
+    """
+    return float(width_mm) * float(ppm) / 2.0 + 0.5
+
+
+def _local_thickness(mask: np.ndarray, max_radius: float) -> np.ndarray:
+    """Largest disk radius, capped at ``max_radius``, that covers each pixel.
+
+    Radii are the same units as ``distance_transform_edt`` (pixel centers).
+    Pixels thicker than ``max_radius`` are reported as ``max_radius``.
+    """
+    thickness = np.zeros(mask.shape, dtype=np.float64)
+    if max_radius <= 0 or not np.any(mask):
+        return thickness
+    inner = ndimage.distance_transform_edt(mask)
+    steps = int(np.ceil(float(max_radius) * 2.0))
+    for step in range(1, steps + 1):
+        radius = min(float(max_radius), step / 2.0)
+        seeds = inner >= radius - 1e-6
+        if not np.any(seeds):
+            break
+        dist = ndimage.distance_transform_edt(~seeds)
+        thickness[dist <= radius + 1e-6] = radius
+        if radius >= float(max_radius) - 1e-9:
+            break
+    return thickness
+
+
+def _close_narrow_gaps(mask: np.ndarray, config: PlateConfig) -> np.ndarray:
+    """Fill gaps narrower than ``minimum_gap_mm``.
+
+    A white line the nozzle cannot leave open is closed here. Open paper and
+    gaps that already meet the minimum are left alone, including the concave
+    corner of an L, which still belongs to a wide white region.
+    """
+    if not np.any(mask) or np.all(mask):
+        return mask
+    limit = _stroke_radius_px(config.minimum_gap_mm, config.analysis_ppm)
+    if limit <= 0.5:
+        return mask
+    thickness = _local_thickness(~mask, limit)
+    narrow = (~mask) & (thickness < limit - 1e-6)
+    if not np.any(narrow):
+        return mask
+    return mask | narrow
+
+
+def _enforce_minimum_width(mask: np.ndarray, config: PlateConfig) -> np.ndarray:
+    """Thicken only strokes thinner than ``minimum_width_mm``.
+
+    Large solid areas are not inflated. Growth stops at a gap that is already
+    only ``minimum_gap_mm`` wide, so a thin line beside a kept white channel
+    gets thicker on the open side and does not seal the channel.
+    """
+    if not np.any(mask):
+        return mask
+    ppm = float(config.analysis_ppm)
+    target = _stroke_radius_px(config.minimum_width_mm, ppm)
+    gap_limit = _stroke_radius_px(config.minimum_gap_mm, ppm)
+    thickness = _local_thickness(mask, target)
+    deficit = np.zeros(mask.shape, dtype=np.float64)
+    deficit[mask] = np.clip(target - thickness[mask], 0.0, None)
+    if not np.any(deficit > 0.05):
+        return mask
+    dist_out, indices = ndimage.distance_transform_edt(~mask, return_indices=True)
+    near_def = deficit[indices[0], indices[1]]
+    allowed = np.clip(_local_thickness(~mask, gap_limit + target) - gap_limit, 0.0, None)
+    paint = (~mask) & (dist_out <= near_def + 1e-6) & (dist_out <= allowed + 1e-6)
+    return mask | paint
+
+
 def apply_printability(
     mask: np.ndarray,
     config: PlateConfig,
     content_box: tuple[int, int, int, int] | None = None,
+    *,
+    close_narrow_gaps: bool = True,
 ) -> tuple[np.ndarray, dict]:
     result = mask.astype(bool, copy=True)
     before_pixels = int(np.count_nonzero(result))
@@ -84,11 +162,9 @@ def apply_printability(
         result = _remove_scan_frame(result, config, content_box)
     result = _component_cleanup(result, config)
     result = _fill_tiny_holes(result, config)
-
-    target_px = config.minimum_width_mm * config.analysis_ppm
-    thicken_iterations = max(0, int(np.floor((target_px - 3.0) / 2.0)))
-    if thicken_iterations:
-        result = ndimage.binary_dilation(result, iterations=thicken_iterations)
+    if close_narrow_gaps:
+        result = _close_narrow_gaps(result, config)
+    result = _enforce_minimum_width(result, config)
 
     margin = int(round(config.edge_margin_mm * config.analysis_ppm))
     margin = min(margin, result.shape[0] // 4, result.shape[1] // 4)
