@@ -23,7 +23,7 @@ def _remove_scan_frame(
     result = mask.copy()
     height, width = result.shape
     x0, y0, x1, y1 = content_box
-    band = max(1, int(round(config.analysis_ppm * 0.80)))
+    band = max(1, int(round(config.pixels_per_mm * 0.80)))
     x0, x1 = max(0, x0), min(width, x1)
     y0, y1 = max(0, y0), min(height, y1)
     result[max(0, y0 - band) : min(height, y0 + band + 1), x0:x1] = False
@@ -38,7 +38,7 @@ def _component_cleanup(mask: np.ndarray, config: PlateConfig) -> np.ndarray:
     if count == 0:
         return mask
     sizes = np.bincount(labels.ravel())
-    threshold = config.minimum_component_mm2 * config.analysis_ppm**2
+    threshold = config.minimum_component_mm2 * config.pixels_per_mm**2
     keep_labels = sizes >= threshold
     keep_labels[0] = False
     # Bounding boxes give the same diagonal without rescanning the full image
@@ -47,7 +47,7 @@ def _component_cleanup(mask: np.ndarray, config: PlateConfig) -> np.ndarray:
         if box is None or keep_labels[label_id]:
             continue
         y, x = box
-        diagonal_mm = float(np.hypot(x.stop - x.start - 1, y.stop - y.start - 1)) / config.analysis_ppm
+        diagonal_mm = float(np.hypot(x.stop - x.start - 1, y.stop - y.start - 1)) / config.pixels_per_mm
         keep_labels[label_id] = diagonal_mm >= config.minimum_width_mm * 3.0
     return keep_labels[labels]
 
@@ -59,7 +59,7 @@ def _fill_tiny_holes(mask: np.ndarray, config: PlateConfig) -> np.ndarray:
         return mask
     sizes = np.bincount(labels.ravel())
     border_labels = set(labels[0, :]) | set(labels[-1, :]) | set(labels[:, 0]) | set(labels[:, -1])
-    threshold = (config.minimum_gap_mm * 0.85 * config.analysis_ppm) ** 2
+    threshold = (config.minimum_gap_mm * 0.85 * config.pixels_per_mm) ** 2
     fill = sizes < threshold
     fill[list(border_labels)] = False
     fill[0] = False
@@ -78,19 +78,18 @@ def apply_printability(
     result = ndimage.binary_closing(
         result,
         structure=np.array([[0, 1, 0], [1, 1, 1], [0, 1, 0]], dtype=bool),
-        iterations=1,
+        iterations=max(1, int(round(config.pixels_per_mm / 6.0))),  # same physical size at any resolution
     )
     if config.remove_scan_frame:
         result = _remove_scan_frame(result, config, content_box)
     result = _component_cleanup(result, config)
     result = _fill_tiny_holes(result, config)
 
-    target_px = config.minimum_width_mm * config.analysis_ppm
-    thicken_iterations = max(0, int(np.floor((target_px - 3.0) / 2.0)))
-    if thicken_iterations:
-        result = ndimage.binary_dilation(result, iterations=thicken_iterations)
+    # Thin features are reported through ``fragile_fraction`` below rather than thickened: a
+    # global dilation here used to grow every edge by a resolution-dependent amount (nothing at
+    # 6 px/mm, 0.08 mm per side at 12 px/mm), which made the plate less faithful to the art.
 
-    margin = int(round(config.edge_margin_mm * config.analysis_ppm))
+    margin = int(round(config.edge_margin_mm * config.pixels_per_mm))
     margin = min(margin, result.shape[0] // 4, result.shape[1] // 4)
     if margin:
         result[:margin, :] = False
@@ -98,7 +97,7 @@ def apply_printability(
         result[:, :margin] = False
         result[:, -margin:] = False
 
-    distance = ndimage.distance_transform_edt(result) / config.analysis_ppm
+    distance = ndimage.distance_transform_edt(result) / config.pixels_per_mm
     fragile = result & (distance < config.nozzle_mm * 0.50)
     metrics = {
         "pixels_before": before_pixels,
@@ -131,7 +130,7 @@ def apply_trapping(masks: list[np.ndarray], config: PlateConfig) -> list[float]:
     if config.trap_mm <= 0 or len(masks) < 2:
         return added
     # One analysis pixel is the finest step the masks can express.
-    radius = max(1.0, config.trap_mm * config.analysis_ppm)
+    radius = max(1.0, config.trap_mm * config.pixels_per_mm)
     darker = masks[0].copy()
     for index in range(1, len(masks)):
         mask = masks[index]
@@ -157,7 +156,7 @@ def registration_mask(shape: tuple[int, int], config: PlateConfig) -> np.ndarray
     them together with the artwork, so all plates stay consistent.
     """
     height, width = shape
-    ppm = config.analysis_ppm
+    ppm = config.pixels_per_mm
     mask = np.zeros(shape, dtype=bool)
     margin = config.edge_margin_mm
     band = config.registration_band_mm

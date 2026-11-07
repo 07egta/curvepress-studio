@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import tempfile
 import uuid
+from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
@@ -12,6 +13,7 @@ from .config import PlateConfig
 from .curves import contour_regions, cubic_segments, curve_counts, regions_svg, sample_segments
 from .image_pipeline import (
     composite_preview,
+    choose_ppm,
     correct_illumination,
     fit_on_plate,
     load_image,
@@ -25,7 +27,7 @@ from .proof import make_heightmap, make_proof
 
 
 def _save_curve_preview(layers: list[PlateLayer], config: PlateConfig) -> Image.Image:
-    ppm = config.analysis_ppm
+    ppm = config.pixels_per_mm
     width, height = int(round(config.width_mm * ppm)), int(round(config.height_mm * ppm))
     image = Image.new("RGB", (width, height), (43, 58, 48))
     draw = ImageDraw.Draw(image)
@@ -72,8 +74,10 @@ def analyze_image(
         else PlateConfig.from_dict(raw_config)
     )
     source_original = load_image(data)
+    if not config.analysis_ppm:
+        config = replace(config, analysis_ppm=choose_ppm(source_original, config))
     source, content_box = fit_on_plate(source_original, config)
-    corrected = correct_illumination(source, config.contrast)
+    corrected = correct_illumination(source, config.contrast, config.pixels_per_mm)
     mask_layers, cleanup_reports = make_masks(corrected, config, content_box, source)
 
     layers: list[PlateLayer] = []
@@ -135,6 +139,7 @@ def analyze_image(
         "total_height_mm": config.base_height_mm + config.relief_height_mm,
         "mirrored_for_print": config.mirror_for_print,
         "registration_marks": config.uses_registration(),
+        "resolution": {"px_per_mm": config.pixels_per_mm, "pixel_mm": round(1.0 / config.pixels_per_mm, 3)},
         "tiles": {"count": len(tiles), "cols": len({t.col for t in tiles}), "rows": len({t.row for t in tiles})},
         "trap_mm": config.trap_mm if len(layers) > 1 else 0.0,
         "type_high_shim_mm": type_high_shim_mm(config.base_height_mm + config.relief_height_mm),

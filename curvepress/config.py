@@ -21,7 +21,7 @@ class PlateConfig:
     minimum_gap_mm: float | None = None
     minimum_component_mm2: float | None = None
     curve_tolerance_mm: float | None = None
-    analysis_ppm: int = 6
+    analysis_ppm: int = 0  # 0 = pick from the source image (6-12 px/mm)
     style: str = "woodcut"
     detail: float = 0.68
     contrast: float = 0.55
@@ -91,7 +91,7 @@ class PlateConfig:
             raise ValueError("bed_mm must be 0 (no tiling) or between 60 and 600")
         data["detail"] = max(0.0, min(1.0, data["detail"]))
         data["contrast"] = max(0.0, min(1.0, data["contrast"]))
-        data["analysis_ppm"] = int(max(4, min(12, data["analysis_ppm"])))
+        data["analysis_ppm"] = 0 if not data["analysis_ppm"] else int(max(4, min(12, data["analysis_ppm"])))
         data["color_count"] = int(max(2, min(6, data["color_count"])))
         nozzle, layer = data["nozzle_mm"], data["layer_height_mm"]
         defaults = {
@@ -133,6 +133,11 @@ class PlateConfig:
             raise ValueError("config must be an object")
         allowed = cls.__dataclass_fields__.keys()
         return cls(**{key: value for key, value in raw.items() if key in allowed}).resolved()
+
+    @property
+    def pixels_per_mm(self) -> int:
+        """Analysis resolution; 6 until an image has been analysed with ``analysis_ppm=0`` (auto)."""
+        return self.analysis_ppm or 6
 
     def public_dict(self) -> dict[str, Any]:
         return asdict(self.resolved())

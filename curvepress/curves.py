@@ -68,10 +68,17 @@ def simplify_closed(points: np.ndarray, tolerance: float) -> np.ndarray | None:
 def contour_regions(mask: np.ndarray, config: PlateConfig) -> list[CurveRegion]:
     field = ndimage.gaussian_filter(
         mask.astype(np.float64),
-        sigma=max(0.42, config.curve_tolerance_mm * config.analysis_ppm * 0.35),
+        sigma=max(0.42, config.curve_tolerance_mm * config.pixels_per_mm * 0.35),
     )
-    x = np.linspace(0.0, config.width_mm, mask.shape[1])
-    y = np.linspace(0.0, config.height_mm, mask.shape[0])
+    # Pixel i covers [i, i+1) * pitch, so its centre sits half a pixel in.  (``linspace(0, size, n)``
+    # puts the first and last centres on the plate edge, which stretches the art by up to half a
+    # pixel and shifts it relative to the proof and the previews.)  A one-pixel empty border keeps
+    # every contour closed.
+    field = np.pad(field, 1)
+    ny, nx = field.shape
+    pitch_x, pitch_y = config.width_mm / (nx - 2), config.height_mm / (ny - 2)
+    x = (np.arange(nx) - 0.5) * pitch_x
+    y = (np.arange(ny) - 0.5) * pitch_y
     generator = contourpy.contour_generator(x=x, y=y, z=field, fill_type="OuterOffset")
     point_sets, offset_sets = generator.filled(0.50, 1.10)
     regions: list[CurveRegion] = []

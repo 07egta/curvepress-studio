@@ -36,6 +36,7 @@ def convert_command(args: argparse.Namespace) -> int:
     output.mkdir(parents=True, exist_ok=True)
     config = _config_from_args(args)
     result = analyze_image(Path(args.image).read_bytes(), config, output)
+    config = PlateConfig.from_dict(result.metrics["auto_settings"])
     reports: list[dict] = []
     if not args.svg_only:
         try:

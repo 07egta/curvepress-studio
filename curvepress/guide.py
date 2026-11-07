@@ -57,7 +57,7 @@ def build_guide(config: PlateConfig, plate_names: list[str]) -> str:
             f"- 刷る順番は **明るい色 → 暗い色**：{order_ja}",
             "- 見当（けんとう）：各版の右下の「かぎ」(L字)と左下の「ひきつけ」(直線)に、紙の角と下辺を当てて位置を決めます。見当の凸は刷り上がりには出ません。",
             (
-                f"- トラッピング：明るい色の版を、暗い色の下に約{max(1 / config.analysis_ppm, config.trap_mm):.2f} mm広げてあります。"
+                f"- トラッピング：明るい色の版を、暗い色の下に約{max(1 / config.pixels_per_mm, config.trap_mm):.2f} mm広げてあります。"
                 "紙の側には広がらないので絵は変わらず、見当が少しズレても白い隙間が出にくくなります。"
                 if config.trap_mm > 0
                 else "- トラッピングはオフです。見当がズレると色の境目に白い隙間が出ます。"
@@ -106,7 +106,7 @@ def build_guide(config: PlateConfig, plate_names: list[str]) -> str:
             "",
             f"**Colour order** - lightest to darkest: {' -> '.join(reversed(plate_names))}. Push the paper corner and bottom edge against the kagi (L) and hikitsuke (bar) registration ridges; they do not print.",
             (
-                f"**Trapping** - lighter plates are spread about {max(1 / config.analysis_ppm, config.trap_mm):.2f} mm under the darker plates. "
+                f"**Trapping** - lighter plates are spread about {max(1 / config.pixels_per_mm, config.trap_mm):.2f} mm under the darker plates. "
                 "The spread never reaches bare paper, so the picture is unchanged but small misregistration will not leave white gaps."
                 if config.trap_mm > 0
                 else "**Trapping** - off; misregistration will show white gaps at colour borders."

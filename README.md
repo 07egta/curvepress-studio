@@ -46,6 +46,11 @@ flowchart LR
     E --> F[Print & test]
 ```
 
+## New in 0.3.3 — more faithful plates
+
+- Edges were half a pixel off and the analysis was always 6 px/mm. Now pixel centres are exact and **Fidelity: Auto** uses up to 12 px/mm when the source image is sharp (setting under Step 3). Error against a known drawing: 9.4 % to 5.3 %.
+- Finer STL/3MF curves (0.006-0.02 mm).
+
 ## New in 0.3.2 — big plates, small printers
 
 - **Tiling**: pick your printer bed and oversized plates are cut into exact, closed tiles (`--bed 180` on the CLI).
@@ -215,6 +220,11 @@ Issues and pull requests are welcome. Please include enough input and configurat
 CurvePress Studioは、写真・スキャン・ロゴ・線画を、FDM方式の3Dプリンターで出力できる凹凸プレートへ変換するローカルアプリです。画像の構図を同じ座標で保ちながら、画素を滑らかな曲線に変換し、SVG・STEP・3MF・STLを出力します。
 
 画像は自分のPC上で処理され、クラウドの画像サービスへ送信されません。
+
+### 0.3.3の新機能 — もっと忠実に
+
+- 輪郭が半ピクセルずれていて、解像度も常に6 px/mmでした。ピクセル中心で正確になり、**再現の細かさ：自動**が元絵に合わせて最大12 px/mmまで使います（手順3で変更可）。正解のある絵でのズレは 9.4 % → 5.3 %。
+- STL/3MFの曲線も細かく（0.006〜0.02 mm）。
 
 ### 0.3.2の新機能 — 大きな版を小さなプリンタで
 

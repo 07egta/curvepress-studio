@@ -66,6 +66,15 @@ def _flatten(points: np.ndarray, tolerance: float) -> np.ndarray:
     return poly[keep]
 
 
+def flatten_tolerance(config: PlateConfig) -> float:
+    """Largest allowed gap (mm) between a Bezier curve and its straight-edged mesh approximation.
+
+    A tenth of a nozzle width or finer, so tiny round dots and fine curves do not turn into
+    visible polygons or lose area in the STL/3MF.
+    """
+    return max(0.006, min(0.02, config.curve_tolerance_mm * 0.2))
+
+
 def _point_in_polygon(point: np.ndarray, polygon: np.ndarray) -> bool:
     x, y = float(point[0]), float(point[1])
     xs, ys = polygon[:, 0], polygon[:, 1]
@@ -115,7 +124,7 @@ def build_plate_mesh(layer: PlateLayer, config: PlateConfig) -> tuple[np.ndarray
         raise MeshUnavailable("mapbox_earcut is not installed: pip install mapbox_earcut")
     width, height = config.width_mm, config.height_mm
     base, top = config.base_height_mm, config.base_height_mm + config.relief_height_mm
-    tolerance = max(0.012, min(0.04, config.curve_tolerance_mm * 0.35))
+    tolerance = flatten_tolerance(config)
 
     def mapped(poly: np.ndarray) -> np.ndarray:
         x = width - poly[:, 0] if config.mirror_for_print else poly[:, 0]
@@ -225,4 +234,4 @@ def mesh_volume(vertices: np.ndarray, triangles: np.ndarray) -> float:
     return float(np.einsum("ij,ij->i", v[:, 0], np.cross(v[:, 1], v[:, 2])).sum() / 6.0)
 
 
-__all__ = ["MeshUnavailable", "build_plate_mesh", "write_binary_stl", "mesh_volume", "math"]
+__all__ = ["MeshUnavailable", "build_plate_mesh", "flatten_tolerance", "write_binary_stl", "mesh_volume", "math"]

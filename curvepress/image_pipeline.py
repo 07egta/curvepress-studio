@@ -26,6 +26,31 @@ def load_image(data: bytes) -> Image.Image:
     return background.convert("RGB")
 
 
+MAX_ANALYSIS_PIXELS = 5_500_000  # keeps big plates responsive: ~2300 x 2300 analysis pixels
+
+
+def choose_ppm(source: Image.Image, config: PlateConfig) -> int:
+    """Analysis resolution in pixels per mm.
+
+    A fixed 6 px/mm throws away detail a sharp source still has (edges land on a 0.17 mm grid).
+    Auto picks what the source can actually resolve, from 6 up to 12, within a pixel budget.
+    """
+    if config.analysis_ppm:
+        return config.analysis_ppm
+    band = config.registration_band_mm if config.uses_registration() else 0.0
+    usable_w = max(1.0, config.width_mm - 2 * config.edge_margin_mm)
+    usable_h = max(1.0, config.height_mm - 2 * config.edge_margin_mm - band)
+    available = min(source.width / usable_w, source.height / usable_h)
+    wanted = int(np.clip(np.ceil(available - 0.25), 6, 12))
+    budget = int(np.sqrt(MAX_ANALYSIS_PIXELS / (config.width_mm * config.height_mm)))
+    return max(6, min(wanted, budget))
+
+
+def _odd(value: float) -> int:
+    size = max(3, int(round(value)))
+    return size if size % 2 else size + 1
+
+
 def _paper_crop(image: Image.Image) -> Image.Image:
     rgb = np.asarray(image.convert("RGB"))
     gray = np.mean(rgb, axis=2)
@@ -62,13 +87,13 @@ def _paper_crop(image: Image.Image) -> Image.Image:
 
 
 def fit_on_plate(image: Image.Image, config: PlateConfig) -> tuple[Image.Image, tuple[int, int, int, int]]:
-    nx = int(round(config.width_mm * config.analysis_ppm))
-    ny = int(round(config.height_mm * config.analysis_ppm))
-    margin = int(round(config.edge_margin_mm * config.analysis_ppm))
+    nx = int(round(config.width_mm * config.pixels_per_mm))
+    ny = int(round(config.height_mm * config.pixels_per_mm))
+    margin = int(round(config.edge_margin_mm * config.pixels_per_mm))
     # Multi-colour plates reserve a band along the bottom edge for kento marks
     # so the registration stops never touch the artwork.
     band = (
-        int(round(config.registration_band_mm * config.analysis_ppm))
+        int(round(config.registration_band_mm * config.pixels_per_mm))
         if config.uses_registration()
         else 0
     )
@@ -88,20 +113,37 @@ def fit_on_plate(image: Image.Image, config: PlateConfig) -> tuple[Image.Image, 
     return canvas, (x0, y0, x0 + fitted.width, y0 + fitted.height)
 
 
-def correct_illumination(image: Image.Image, contrast: float) -> Image.Image:
+def _smooth(array: np.ndarray, sigma: float | tuple) -> np.ndarray:
+    """Gaussian blur; large, low-frequency blurs run on a reduced copy (same result, much faster)."""
+    sigmas = np.atleast_1d(np.asarray(sigma, dtype=float))
+    spatial = float(sigmas[:2].max())
+    factor = int(max(1, spatial // 4))
+    if factor == 1:
+        return ndimage.gaussian_filter(array, sigma=sigma)
+    shape = array.shape
+    zoom = tuple(1.0 / factor if axis < 2 else 1.0 for axis in range(array.ndim))
+    small = ndimage.zoom(array, zoom, order=1, mode="nearest", grid_mode=True)
+    reduced = tuple(value / factor if axis < 2 else value for axis, value in enumerate(np.broadcast_to(sigmas, array.ndim)))
+    small = ndimage.gaussian_filter(small, sigma=reduced)
+    back = tuple(shape[axis] / small.shape[axis] if axis < 2 else 1.0 for axis in range(array.ndim))
+    return ndimage.zoom(small, back, order=1, mode="nearest", grid_mode=True)[tuple(slice(0, n) for n in shape)]
+
+
+def correct_illumination(image: Image.Image, contrast: float, ppm: float = 6.0) -> Image.Image:
+    scale = max(0.5, ppm / 6.0)  # the filter sizes below were tuned at 6 px/mm
     source = np.asarray(image.convert("RGB"), dtype=np.float64)
     paper = np.percentile(source.reshape(-1, 3), 96.0, axis=0)
     neutral = source * (float(np.mean(paper)) / np.maximum(paper, 1.0))
 
-    sigma = max(9.0, min(source.shape[:2]) * 0.045)
-    field = ndimage.gaussian_filter(neutral, sigma=(sigma, sigma, 0.0))
+    sigma = max(9.0 * scale, min(source.shape[:2]) * 0.045)
+    field = _smooth(neutral, (sigma, sigma, 0.0))
     target = np.percentile(field.reshape(-1, 3), 62.0, axis=0)
     flat = neutral / np.maximum(field, 18.0) * target
     balanced = neutral * (0.72 - 0.20 * contrast) + flat * (0.28 + 0.20 * contrast)
 
     luminance = 0.2126 * balanced[..., 0] + 0.7152 * balanced[..., 1] + 0.0722 * balanced[..., 2]
-    fine = ndimage.gaussian_filter(luminance, sigma=1.8)
-    broad = ndimage.gaussian_filter(luminance, sigma=9.0)
+    fine = ndimage.gaussian_filter(luminance, sigma=1.8 * scale)
+    broad = _smooth(luminance, 9.0 * scale)
     enhanced = luminance + (0.45 + 0.75 * contrast) * (luminance - fine) + 0.22 * (luminance - broad)
     ratio = enhanced / np.maximum(luminance, 8.0)
     corrected = balanced * ratio[..., None]
@@ -132,7 +174,7 @@ def otsu_threshold(gray: np.ndarray) -> float:
 
 def sauvola_threshold(gray: np.ndarray, config: PlateConfig) -> np.ndarray:
     window_mm = 2.6 + 3.2 * (1.0 - config.detail)
-    window = max(7, int(round(window_mm * config.analysis_ppm)))
+    window = max(7, int(round(window_mm * config.pixels_per_mm)))
     if window % 2 == 0:
         window += 1
     mean = ndimage.uniform_filter(gray, size=window, mode="reflect")
@@ -154,7 +196,7 @@ def _woodcut_mask(corrected: Image.Image, config: PlateConfig) -> np.ndarray:
     gradient = np.hypot(gx, gy)
     edge_level = np.percentile(gradient, 78 + 12 * (1.0 - config.detail))
     edges = (gradient > edge_level) & (gray < 0.91)
-    edges = ndimage.binary_dilation(edges, iterations=1)
+    edges = ndimage.binary_dilation(edges, iterations=max(1, int(round(config.pixels_per_mm / 6.0))))
 
     # Dark masses give visual weight; local threshold and gradients recover faded linework.
     mask = masses | (local & (gray < 0.82 + 0.08 * config.detail)) | edges
@@ -176,9 +218,9 @@ def _poster_mask(corrected: Image.Image, config: PlateConfig) -> np.ndarray:
 def _halftone_mask(corrected: Image.Image, config: PlateConfig) -> np.ndarray:
     gray = grayscale(corrected)
     height, width = gray.shape
-    pitch = max(4, int(round(config.halftone_pitch_mm * config.analysis_ppm)))
-    min_radius = config.halftone_min_dot_mm * config.analysis_ppm * 0.5
-    max_radius = min(config.halftone_max_dot_mm, config.halftone_pitch_mm * 0.96) * config.analysis_ppm * 0.5
+    pitch = max(4, int(round(config.halftone_pitch_mm * config.pixels_per_mm)))
+    min_radius = config.halftone_min_dot_mm * config.pixels_per_mm * 0.5
+    max_radius = min(config.halftone_max_dot_mm, config.halftone_pitch_mm * 0.96) * config.pixels_per_mm * 0.5
     angle = math.radians(config.halftone_angle_deg)
     cos_a, sin_a = math.cos(angle), math.sin(angle)
     cx, cy = width * 0.5, height * 0.5
@@ -278,7 +320,7 @@ def _color_masks(
     crop = rgb.crop(content_box)
     # A gentle blur keeps paper grain and JPEG noise from becoming speckle plates.
     smooth = Image.fromarray(
-        ndimage.median_filter(np.asarray(crop), size=(3, 3, 1)).astype(np.uint8)
+        ndimage.median_filter(np.asarray(crop), size=(_odd(3 * config.pixels_per_mm / 6.0), _odd(3 * config.pixels_per_mm / 6.0), 1)).astype(np.uint8)
     )
     count = config.color_count + 1
     palette, labels_crop = _kmeans_palette(np.asarray(smooth), count, config.proof_seed)

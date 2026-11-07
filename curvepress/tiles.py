@@ -16,7 +16,7 @@ from pathlib import Path
 import numpy as np
 
 from .config import PlateConfig
-from .mesh import MeshUnavailable, _flatten
+from .mesh import MeshUnavailable, _flatten, flatten_tolerance
 from .models import PlateLayer
 
 try:
@@ -73,7 +73,7 @@ def layer_solid(layer: PlateLayer, config: PlateConfig):
     """The raised area of a plate as shapely geometry in plate millimetres (x right, y up)."""
     _need_shapely()
     width, height = config.width_mm, config.height_mm
-    tolerance = max(0.012, min(0.04, config.curve_tolerance_mm * 0.35))
+    tolerance = flatten_tolerance(config)
 
     def mapped(poly: np.ndarray) -> np.ndarray:
         x = width - poly[:, 0] if config.mirror_for_print else poly[:, 0]

@@ -20,3 +20,14 @@ What was checked on the web before adding trapping and the print guide, and what
 
 - Reduction-print carve guides (one block, stage-by-stage carving) - useful for hand carving, not needed for separate printed plates.
 - Interlocking keys between tiles (tiles are butt-joined on a backing board).
+
+## Fidelity measurements (0.3.3)
+
+Ground truth: a 120 x 80 mm drawing (rings 0.6-1.4 mm, 0.6 mm radiating lines, a sharp star, dots 0.6-3 mm, serif text) rendered at 20 px/mm. The plate is rasterised at 20 px/mm and compared with the drawing (intersection over union).
+
+| Poster mode | 0.3.2 (6 px/mm) | 0.3.3 (auto = 12 px/mm) |
+|---|---|---|
+| IoU | 0.906 | 0.948 |
+| Differing area | 9.4 % | 5.3 % |
+
+Geometry alone (perfect binarisation, then contours + curve fitting): 0.899 with the old pixel convention, 0.924 with pixel centres, up to 0.96 with a sub-pixel grey field and half the simplification tolerance. Sub-pixel grey contours are not implemented yet.

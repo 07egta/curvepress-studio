@@ -274,6 +274,7 @@ class CurvePressHandler(BaseHTTPRequestHandler):
                 image_id = _remember_image(image_data)
                 config = PlateConfig.from_dict(payload.get("config", {}))
                 result = analyze_image(image_data, config, OUTPUT_ROOT / "jobs", defer_proof=True)
+                config = PlateConfig.from_dict(result.metrics["auto_settings"])  # carries the chosen resolution
                 done = threading.Event()
                 with LOCK:
                     while len(JOBS) >= MAX_JOBS:

@@ -4,6 +4,30 @@ All notable changes to CurvePress Studio are documented here.
 
 CurvePress is in beta. Version notes describe the repository state and may not represent a packaged release.
 
+## 0.3.3 — 2026-11-07
+
+### English
+
+Fidelity release: the plate now follows the artwork more closely. Measured on a drawing with a known answer (120 x 80 mm, lines, rings, star, dots, text), the share of area that differs from the ideal plate fell from 9.4 % to 5.3 % in poster mode.
+
+- **Edges were half a pixel off.** Contours used `linspace(0, size, n)` for pixel positions, so a rectangle drawn at exactly 20-50 mm came out up to 0.08 mm off and slightly stretched, and disagreed with the proof and previews. Pixel centres are now used; the same rectangle lands within 0.01 mm.
+- **Automatic analysis resolution.** The source image was always reduced to 6 px/mm. "Fidelity: Auto" (new setting, default) uses what the source can resolve, 6 to 12 px/mm (0.17 to 0.08 mm per pixel), within a pixel budget so large plates stay responsive. "Fast / Fine / Maximum" force 6 / 9 / 12.
+- **Removed a resolution-dependent bug.** The printability step dilated the whole plate once the resolution reached 12 px/mm (0.08 mm per side), and not at all below. Thin features are still reported through the fragile-fraction note, but edges no longer move with the resolution setting.
+- Filters tuned for 6 px/mm (illumination correction, edge detection, noise filter, pinhole closing) now scale with the resolution, so the look stays the same and only the accuracy improves. Large blurs are computed on a reduced copy, which keeps 12 px/mm analysis at 2-6 s.
+- **Finer meshes.** STL/3MF/STEP-free meshes now follow curves within 0.006-0.02 mm instead of 0.012-0.04 mm.
+- The proof/report shows the precision (mm per pixel).
+
+### 日本語
+
+「もっと忠実に」のリリース。正解のある絵（120×80 mm、線・輪・星・点・文字）で測ると、ポスターモードで理想の版とズレる面積が 9.4 % → 5.3 % に減りました。
+
+- **輪郭が半ピクセルずれていました。** ぴったり 20〜50 mm に描いた四角が最大 0.08 mm ずれ、少し引き伸ばされ、プルーフやプレビューとも合っていませんでした。ピクセル中心で計算するようにして、同じ四角が 0.01 mm 以内に収まります。
+- **解像度の自動調整。** これまで元絵は常に 1 mm あたり 6 px に縮められていました。新しい「再現の細かさ：自動」（既定）は、元絵が持っている細かさ（6〜12 px/mm、1 ピクセル 0.17〜0.08 mm）まで使い、大きい版では処理が重くならないよう上限を設けます。「速い／細かい／最高」で 6／9／12 を固定できます。
+- **解像度で結果が変わる不具合を修正。** 12 px/mm 以上のときだけ版全体が片側 0.08 mm 太っていました。細い部分は従来どおり「壊れやすい」注意で知らせ、輪郭は解像度で動かなくなりました。
+- 6 px/mm 前提だったフィルタ（照明補正・輪郭検出・ノイズ除去・小穴埋め）も解像度に合わせて変わるので、見た目はそのままで精度だけ上がります。大きなぼかしは縮小コピーで計算し、12 px/mm でも 2〜6 秒です。
+- **メッシュを細かく。** STL/3MF が曲線に沿う誤差を 0.012〜0.04 mm → 0.006〜0.02 mm に。
+- 画面の情報欄に「精度（mm/px）」を表示。
+
 ## 0.3.2 — 2026-11-06
 
 ### English
